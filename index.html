@@ -1,0 +1,17 @@
+<html lang="en"><head>
+    <meta charset="utf-8">
+    <link rel="icon" href="favicon.ico">
+    <title>acg-game</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="acg-game">
+    <link rel="apple-touch-icon" href="icon-152x152.png">
+    <link rel="manifest" href="manifest.json">
+    <script>if('serviceWorker' in navigator){
+        navigator.serviceWorker.register('/acg_game/sw.js'
+            ).then( (reg)=>{ console.log('Service worker registered.',reg); } );
+    }</script>
+
+</head>
+    <script type="module" src="./src/main.js"></script>
+</html>
