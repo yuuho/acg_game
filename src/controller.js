@@ -6,36 +6,44 @@
 
 class KyeBoard {
 
-    constructor() {
+    constructor( timer ) {
+        this.gameTimer = timer;
         this.ArrowUp    = [];
         this.ArrowDown  = [];
         this.ArrowLeft  = [];
         this.ArrowRight = [];
         this.Enter      = [];
-    }
-
-    initialize( timer ) {
-        this.gameTimer = timer;
 
         // キーが押されたときの処理
-        window.addEventListener('keydown',(evt)=>{
-            if(evt.key in this){
-                console.log(evt.key, 'v');
-                const queue = this[evt.key];
-                // キューに中身が無い or キューの最後のやつが離し済み なら追加
-                if(queue.length===0 || 'end' in queue[queue.length-1]){
-                    queue.push({ 'start': (new Date()).getTime()-this.gameTimer.startTime });
+        this.keyDownHandler = (evt)=>{
+                if(evt.key in this){
+                    console.log(evt.key, 'v');
+                    const queue = this[evt.key];
+                    // キューに中身が無い or キューの最後のやつが離し済み なら追加
+                    if(queue.length===0 || 'end' in queue[queue.length-1]){
+                        queue.push({ 'start': (new Date()).getTime()-this.gameTimer.startTime });
+                    }
                 }
-            }
-        },false);
+            };
         // キーが離されたときの処理
-        window.addEventListener('keyup',(evt)=>{
-            if(evt.key in this){
-                console.log(evt.key, '^');
-                const queue = this[evt.key];
-                queue[queue.length-1]['end'] = (new Date()).getTime()-this.gameTimer.startTime;
-            }
-        },false);
+        this.keyUpHandler = (evt)=>{
+                if(evt.key in this){
+                    console.log(evt.key, '^');
+                    const queue = this[evt.key];
+                    queue[queue.length-1]['end'] = (new Date()).getTime()-this.gameTimer.startTime;
+                }
+            };
+    }
+
+    activate() {
+        console.log('keyboard activate');
+        window.addEventListener('keydown',this.keyDownHandler,false);
+        window.addEventListener('keyup',  this.keyUpHandler,  false);
+    }
+
+    deactivate() {
+        window.removeEventListener('keydown',this.keyDownHandler,false);
+        window.removeEventListener('keyup',  this.keyUpHandler,  false);
     }
 
 }
@@ -43,15 +51,18 @@ class KyeBoard {
 
 export default class Controller {
 
-    constructor() {
+    constructor( timer ) {
         console.log("controller initialized");
-        this.KeyBoard = new KyeBoard();
-        
+        this.KeyBoard = new KyeBoard( timer );
+        this.Mouse = null;
 
     }
 
-    initialize( timer ) {
-        this.KeyBoard.initialize( timer );
+    activate() {
+        this.KeyBoard.activate();
+    }
+    deactivate() {
+        this.KeyBoard.deactivate();
     }
 
 }

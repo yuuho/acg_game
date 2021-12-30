@@ -38,12 +38,13 @@ class GameTimer{
 // シーンの切り替えなど
 class SceneManager{
 
-    constructor( realScreen, controller ) {
+    constructor( realScreen, timer ) {
         this.state = null;
         this.scenes = {};
+        this.timer = timer;
 
         this.realScreen = realScreen;
-        this.controller = controller;
+        //this.controller = controller;
 
         this.changeScene('default', StartScene);
     }
@@ -53,7 +54,7 @@ class SceneManager{
             this.scenes[this.state].exit();
         }
         if( !(sceneName in this.scenes) ){
-            this.scenes[sceneName] = new scene(this.realScreen, this.controller, this);
+            this.scenes[sceneName] = new scene(this.realScreen, this.timer, this);
         }
         this.state = sceneName;
         this.scenes[this.state].enter();
@@ -66,10 +67,10 @@ class SceneManager{
 
 
 export default class Game{
-    constructor( realScreen, controller ) {
+    constructor( realScreen ) {
         this.timer = new GameTimer();
-        controller.initialize( this.timer );
-        this.sceneMg = new SceneManager( realScreen, controller );
+        //controller.initialize( this.timer );
+        this.sceneMg = new SceneManager( realScreen, this.timer );
     }
 
     start() {

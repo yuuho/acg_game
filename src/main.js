@@ -8,9 +8,9 @@ const main = ()=>{
     // UI要素
     RealScreen.initialize();
 
-    const controller = new Controller();
+    //const controller = new Controller();
 
-    const game = new Game( RealScreen, controller );
+    const game = new Game( RealScreen );
     game.start();
 };
 

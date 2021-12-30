@@ -16,6 +16,7 @@ var urlsToCache = [
     "src/scene_game.js",
     "src/scene_start.js",
     "src/scenebase.js",
+    "src/strutil.js",
 ];
 
 

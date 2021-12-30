@@ -32,6 +32,7 @@ class RealScreen{
         document.documentElement.style.height = '100%';
         document.body.style.margin = '0';
         document.body.style.height = '100%';
+        ////// document.body.style.backgroundColor = "#00ff00";
         // make canvas
         this.canvas = document.createElement('canvas');
         document.body.appendChild(this.canvas);
