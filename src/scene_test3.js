@@ -1,10 +1,11 @@
 
 import SceneBase from './scenebase.js';
 import GLUtil from './glutil.js';
-import {OffScreenHD} from './offscreen.js';
-import Controller from './controller.js';
-import StartScene from './scene_start.js';
 import StringUtil from './strutil.js';
+import {OffScreenHD} from './offscreen.js';
+import {Controller} from './controller.js';
+// 遷移先
+import StartScene from './scene_start.js';
 
 
 const vshader = `\
@@ -46,13 +47,9 @@ export default class Test3Scene extends SceneBase{
 
     static sceneName = "Test3";
 
-    constructor( realScreen, timer, sceneMg ){
-        super();
-        this.realScreen = realScreen;
-        this.timer = timer;
-        this.controller = new Controller( timer );
-        this.sceneMg = sceneMg;
-        this.offScreen = new OffScreenHD( realScreen );
+    scene_initialize() {
+        this.offScreen = new OffScreenHD( this.realScreen );
+        this.controller = new Controller( this.timer );
 
         this.cursor = 0;
         this.ctrlHist = {'ArrowUp':{}, 'ArrowDown':{}, 'Enter':{}};
@@ -62,20 +59,9 @@ export default class Test3Scene extends SceneBase{
         this.gl = this.offScreen.context;
         this.program = GLUtil.createProgram(this.gl, vshader, fshader);
         this.gl.useProgram(this.program);
-
-    }
-
-    enter() {
-        this.realScreen.setOffScreen( this.offScreen );
-        this.controller.activate();
-    }
-
-    exit() {
-        this.controller.deactivate();
     }
 
     render() {
-
         // どこを選択しているか把握
         let cursordiff = 0;
         let enter = false;

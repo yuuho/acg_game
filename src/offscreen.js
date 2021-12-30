@@ -51,4 +51,4 @@ class OffScreenFull extends OffScreenBase{
 }
 
 
-export { OffScreenFull, OffScreenHD};
+export { OffScreenFull, OffScreenHD };

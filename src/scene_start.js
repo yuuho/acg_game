@@ -1,13 +1,14 @@
 
 import SceneBase from './scenebase.js';
 import GLUtil from './glutil.js';
+import StringUtil from './strutil.js';
 import {OffScreenHD} from './offscreen.js';
-import Controller from './controller.js';
+import {Controller} from './controller.js';
+// 遷移先
 import GameScene from './scene_game.js';
 import Test1Scene from './scene_test1.js';
 import Test2Scene from './scene_test2.js';
 import Test3Scene from './scene_test3.js';
-import StringUtil from './strutil.js';
 
 
 const vshader = `\
@@ -49,13 +50,9 @@ export default class StartScene extends SceneBase{
 
     static sceneName = "START";
 
-    constructor( realScreen, timer, sceneMg ){
-        super();
-        this.realScreen = realScreen;
-        this.timer = timer;
-        this.controller = new Controller( timer );
-        this.sceneMg = sceneMg;
-        this.offScreen = new OffScreenHD( realScreen );
+    scene_initialize() {
+        this.offScreen = new OffScreenHD( this.realScreen );
+        this.controller = new Controller( this.timer );
 
         this.cursor = 0;
         this.ctrlHist = {'ArrowUp':{}, 'ArrowDown':{}, 'Enter':{}};
@@ -68,7 +65,6 @@ export default class StartScene extends SceneBase{
         this.gl = this.offScreen.context;
         this.program = GLUtil.createProgram(this.gl, vshader, fshader);
         this.gl.useProgram(this.program);
-
     }
 
     enter() {

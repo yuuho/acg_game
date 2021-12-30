@@ -49,7 +49,7 @@ class KyeBoard {
 }
 
 
-export default class Controller {
+class Controller {
 
     constructor( timer ) {
         console.log("controller initialized");
@@ -66,3 +66,5 @@ export default class Controller {
     }
 
 }
+
+export { Controller };
