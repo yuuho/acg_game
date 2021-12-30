@@ -37,10 +37,12 @@ void main() {
 
 export default class StartScene extends SceneBase{
 
+    static sceneName = 'GAME';
 
     constructor( realScreen, timer, sceneMg ){
         super();
         this.realScreen = realScreen;
+        this.timer = timer;
         this.controller = new Controller( timer );
         this.sceneMg = sceneMg;
         this.offScreen = new OffScreenHD( realScreen );
@@ -67,7 +69,7 @@ export default class StartScene extends SceneBase{
         this.controller.deactivate();
     }
 
-    render( timer ) {
+    render() {
 
         let cursordiff = 0;
         let enter = false;
@@ -91,8 +93,8 @@ export default class StartScene extends SceneBase{
 
 
         // 描画するものを作る
-        const x = Math.sin( timer.tmpTime*0.003 );
-        const y = Math.cos( timer.tmpTime*0.003 );
+        const x = Math.sin( this.timer.tmpTime*0.003 );
+        const y = Math.cos( this.timer.tmpTime*0.003 );
         const r0=0.2, r1=0.15, r2=0.1, r3=0.14;
         const xl=-0.3, xr=0.3;
         const yt=0.2, h = 0.15, hs=0.05;
@@ -126,7 +128,6 @@ export default class StartScene extends SceneBase{
 
         // 描画処理
         this.gl.clear(this.gl.COLOR_BUFFER_BIT|this.gl.DEPTH_BUFFER_BIT);
-        //this.gl.uniform1f(this.timePtr, timer.tmpTime);
         GLUtil.sendVBO(this.gl, this.program, 'pos',  this.vbo, this.vdim /*= VBO dim*/);
         GLUtil.sendVBO(this.gl, this.program, 'coli', this.cbo, this.cdim /*= CBO dim*/);
         GLUtil.sendIBO(this.gl, this.ibo );

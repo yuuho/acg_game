@@ -7,7 +7,7 @@ class GameTimer{
         this.startTime = (new Date()).getTime(); // ゲーム開始時刻
         this.frameCount = 0; // フレームインデックス
         this.frameRate = 60; // フレームレート
-        this.forceEnd  = 10000; // 強制終了の時刻(ms)
+        this.forceEnd  = 30000; // 強制終了の時刻(ms)
         this.tmpTime = this.startTime;
     }
 
@@ -42,11 +42,9 @@ class SceneManager{
         this.state = null;
         this.scenes = {};
         this.timer = timer;
-
         this.realScreen = realScreen;
-        //this.controller = controller;
 
-        this.changeScene('default', StartScene);
+        this.changeScene(StartScene.sceneName, StartScene);
     }
 
     changeScene( sceneName, scene ) {
@@ -60,8 +58,8 @@ class SceneManager{
         this.scenes[this.state].enter();
     }
 
-    run( timer ) {
-        return this.scenes[this.state].render( timer );
+    run() {
+        return this.scenes[this.state].render();
     }
 }
 
@@ -81,7 +79,7 @@ export default class Game{
         // 現在フレームの時刻を取得(ms)
         this.timer.flush();
         // シーンのレンダリング
-        this.sceneMg.run( this.timer );
+        this.sceneMg.run();
         // 強制終了時刻を過ぎているとき、ゲームを終了する
         if( this.timer.require_end() ){ console.log('GAME END'); return; }
         // 次のフレームの処理を予約

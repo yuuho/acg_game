@@ -1,12 +1,9 @@
 
 import SceneBase from './scenebase.js';
 import GLUtil from './glutil.js';
-import {OffScreenHD} from './offscreen.js';
+import {OffScreenFull} from './offscreen.js';
 import Controller from './controller.js';
-import GameScene from './scene_game.js';
-import Test1Scene from './scene_test1.js';
-import Test2Scene from './scene_test2.js';
-import Test3Scene from './scene_test3.js';
+import StartScene from './scene_start.js';
 import StringUtil from './strutil.js';
 
 
@@ -15,13 +12,15 @@ const vshader = `\
 in vec3 pos;
 in vec3 coli;
 in vec2 tpos;
+uniform float Xlim;
+uniform float Ylim;
 out vec3 colo;
 out vec2 texturecoord;
 
 void main() {
     colo = coli;
     texturecoord = tpos;
-    gl_Position = vec4( pos, 1.0);
+    gl_Position = vec4( pos, 1.0) / vec4(Xlim,Ylim,1.0,1.0);
 }
 `;
 
@@ -45,9 +44,9 @@ void main() {
 
 
 
-export default class StartScene extends SceneBase{
+export default class Test2Scene extends SceneBase{
 
-    static sceneName = "START";
+    static sceneName = "Test2";
 
     constructor( realScreen, timer, sceneMg ){
         super();
@@ -55,15 +54,12 @@ export default class StartScene extends SceneBase{
         this.timer = timer;
         this.controller = new Controller( timer );
         this.sceneMg = sceneMg;
-        this.offScreen = new OffScreenHD( realScreen );
+        this.offScreen = new OffScreenFull( realScreen );
 
         this.cursor = 0;
         this.ctrlHist = {'ArrowUp':{}, 'ArrowDown':{}, 'Enter':{}};
 
-        this.menuList = [{'name':'GAME START',        'scene':GameScene},
-                         {'name':'scene change test', 'scene':Test1Scene},
-                         {'name':'full screen test',  'scene':Test2Scene},
-                         {'name':'controller test',   'scene':Test3Scene},]
+        this.menuList = [ {'name':'back', 'scene':StartScene} ]
 
         this.gl = this.offScreen.context;
         this.program = GLUtil.createProgram(this.gl, vshader, fshader);
@@ -106,6 +102,18 @@ export default class StartScene extends SceneBase{
         }
 
         /////////
+        (()=>{
+            const ratio = this.offScreen.canvas.width/this.offScreen.canvas.height;
+            const Xlim = ratio>16.0/9.0 ? ratio : 16.0/9.0;
+            const Ylim = ratio>16.0/9.0 ? 1.0   : (16.0/9.0)/ratio;
+            const XlimPtr = this.gl.getUniformLocation(this.program, 'Xlim');
+            const YlimPtr = this.gl.getUniformLocation(this.program, 'Ylim');
+            this.gl.uniform1f(XlimPtr, Xlim);
+            this.gl.uniform1f(YlimPtr, Ylim);
+        })();
+        
+
+        /////////
 
         let tmpIDX = 0;
         const array_append = (arr1,arr2)=>Array.prototype.push.apply(arr1,arr2);
@@ -142,7 +150,7 @@ export default class StartScene extends SceneBase{
         (()=>{ // ボタン背景の描画
             const xl=-0.3, xr=0.3;
             const yt=0.2, h=0.15, hs=0.05;
-            const selectedColor    = [ 0.8,0.3,0.3, 0.8,0.3,0.3, 0.8,0.3,0.3, 0.8,0.3,0.3];
+            const selectedColor    = [ 0.3,0.3,0.8, 0.3,0.3,0.8, 0.3,0.3,0.8, 0.3,0.3,0.8];
             const notSelectedColor = [ 0.7,0.7,0.7, 0.7,0.7,0.7, 0.7,0.7,0.7, 0.7,0.7,0.7];
             for(let i=0;i<this.menuList.length;i++){
                 array_append(this.vdata,
@@ -160,7 +168,7 @@ export default class StartScene extends SceneBase{
 
         (()=>{ // 文字列
             ///// テクスチャ設定
-            array_append(this.strings, ['GAME TITLE']);
+            array_append(this.strings, ['back with enter key']);
             for(let i=0;i<this.menuList.length;i++){
                 array_append(this.strings, [this.menuList[i].name]);
             }
@@ -191,8 +199,8 @@ export default class StartScene extends SceneBase{
             const selectedColor    = [ 0.7,0.7,0.7, 0.7,0.7,0.7, 0.7,0.7,0.7, 0.7,0.7,0.7];
             const notSelectedColor = [ 0.8,0.3,0.3, 0.8,0.3,0.3, 0.8,0.3,0.3, 0.8,0.3,0.3];
             for(let i=0;i<this.menuList.length;i++){
-                const xl=xL*0.12*stringRatios[i+1];
-                const xr=xR*0.12*stringRatios[i+1];
+                const xl=xL*0.15*stringRatios[i+1];
+                const xr=xR*0.15*stringRatios[i+1];
                 array_append(this.vdata,
                     [ xl,yt-i*(h+hs)-0,this.depths.text, xr,yt-i*(h+hs)-0,this.depths.text,
                       xl,yt-i*(h+hs)-h,this.depths.text, xr,yt-i*(h+hs)-h,this.depths.text ]);
@@ -218,6 +226,26 @@ export default class StartScene extends SceneBase{
         // 描画処理
         this.gl.clear(this.gl.COLOR_BUFFER_BIT|this.gl.DEPTH_BUFFER_BIT);
         this.gl.drawElements(this.gl.TRIANGLES, this.idata.length, this.gl.UNSIGNED_SHORT, 0);
+
+        (()=>{ // セーフティゾーンの描画
+            const d1 = 0.01, d2 = 0.02, r = 16.0/9.0;
+            const vbo = GLUtil.createVBO(this.gl, [-r+d1, 1.0-d1,-1.0,  r-d1, 1.0-d1,-1.0,
+                                                   -r+d1,-1.0+d1,-1.0,  r-d1,-1.0+d1,-1.0,
+                                                   -1.0+d2, 1.0-d2,-1.0, 1.0-d2, 1.0-d2,-1.0,
+                                                   -1.0+d2,-1.0+d2,-1.0, 1.0-d2,-1.0+d2,-1.0]);
+            const cbo = GLUtil.createVBO(this.gl, [1.0,0.0,0.0, 1.0,0.0,0.0, 1.0,0.0,0.0, 1.0,0.0,0.0,
+                                                   0.0,0.0,1.0, 0.0,0.0,1.0, 0.0,0.0,1.0, 0.0,0.0,1.0 ]);
+            const tbo = GLUtil.createVBO(this.gl, [-1.0,-1.0, -1.0,-1.0, -1.0,-1.0, -1.0,-1.0,
+                                                   -1.0,-1.0, -1.0,-1.0, -1.0,-1.0, -1.0,-1.0 ]);
+            const ibo = GLUtil.createIBO(this.gl, [0,1, 0,2, 1,3, 2,3,  4,5, 4,6, 5,7, 6,7]);
+            GLUtil.sendVBO(this.gl, this.program, 'pos',  vbo, 3 /*= VBO dim*/);
+            GLUtil.sendVBO(this.gl, this.program, 'coli', cbo, 3 /*= VBO dim*/);
+            GLUtil.sendVBO(this.gl, this.program, 'tpos', tbo, 2 /*= VBO dim*/);
+            GLUtil.sendIBO(this.gl, ibo );
+            this.gl.drawElements(this.gl.LINES, 16, this.gl.UNSIGNED_SHORT, 0);
+        })();
+
+
         this.gl.flush();
 
         this.realScreen.renderOffScreen();

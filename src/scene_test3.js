@@ -3,10 +3,7 @@ import SceneBase from './scenebase.js';
 import GLUtil from './glutil.js';
 import {OffScreenHD} from './offscreen.js';
 import Controller from './controller.js';
-import GameScene from './scene_game.js';
-import Test1Scene from './scene_test1.js';
-import Test2Scene from './scene_test2.js';
-import Test3Scene from './scene_test3.js';
+import StartScene from './scene_start.js';
 import StringUtil from './strutil.js';
 
 
@@ -45,9 +42,9 @@ void main() {
 
 
 
-export default class StartScene extends SceneBase{
+export default class Test3Scene extends SceneBase{
 
-    static sceneName = "START";
+    static sceneName = "Test3";
 
     constructor( realScreen, timer, sceneMg ){
         super();
@@ -60,10 +57,7 @@ export default class StartScene extends SceneBase{
         this.cursor = 0;
         this.ctrlHist = {'ArrowUp':{}, 'ArrowDown':{}, 'Enter':{}};
 
-        this.menuList = [{'name':'GAME START',        'scene':GameScene},
-                         {'name':'scene change test', 'scene':Test1Scene},
-                         {'name':'full screen test',  'scene':Test2Scene},
-                         {'name':'controller test',   'scene':Test3Scene},]
+        this.menuList = [ {'name':'back', 'scene':StartScene} ]
 
         this.gl = this.offScreen.context;
         this.program = GLUtil.createProgram(this.gl, vshader, fshader);
@@ -142,7 +136,7 @@ export default class StartScene extends SceneBase{
         (()=>{ // ボタン背景の描画
             const xl=-0.3, xr=0.3;
             const yt=0.2, h=0.15, hs=0.05;
-            const selectedColor    = [ 0.8,0.3,0.3, 0.8,0.3,0.3, 0.8,0.3,0.3, 0.8,0.3,0.3];
+            const selectedColor    = [ 0.3,0.3,0.8, 0.3,0.3,0.8, 0.3,0.3,0.8, 0.3,0.3,0.8];
             const notSelectedColor = [ 0.7,0.7,0.7, 0.7,0.7,0.7, 0.7,0.7,0.7, 0.7,0.7,0.7];
             for(let i=0;i<this.menuList.length;i++){
                 array_append(this.vdata,
@@ -160,7 +154,7 @@ export default class StartScene extends SceneBase{
 
         (()=>{ // 文字列
             ///// テクスチャ設定
-            array_append(this.strings, ['GAME TITLE']);
+            array_append(this.strings, ['back with enter key']);
             for(let i=0;i<this.menuList.length;i++){
                 array_append(this.strings, [this.menuList[i].name]);
             }
@@ -191,8 +185,8 @@ export default class StartScene extends SceneBase{
             const selectedColor    = [ 0.7,0.7,0.7, 0.7,0.7,0.7, 0.7,0.7,0.7, 0.7,0.7,0.7];
             const notSelectedColor = [ 0.8,0.3,0.3, 0.8,0.3,0.3, 0.8,0.3,0.3, 0.8,0.3,0.3];
             for(let i=0;i<this.menuList.length;i++){
-                const xl=xL*0.12*stringRatios[i+1];
-                const xr=xR*0.12*stringRatios[i+1];
+                const xl=xL*0.15*stringRatios[i+1];
+                const xr=xR*0.15*stringRatios[i+1];
                 array_append(this.vdata,
                     [ xl,yt-i*(h+hs)-0,this.depths.text, xr,yt-i*(h+hs)-0,this.depths.text,
                       xl,yt-i*(h+hs)-h,this.depths.text, xr,yt-i*(h+hs)-h,this.depths.text ]);

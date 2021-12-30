@@ -69,21 +69,4 @@ export default class GLUtil {
         return texObj;
     }
 
-    static createTextureX(gl, canvas, size=512) {
-        const texObj = gl.createTexture();
-        // テクスチャをバインドする
-        gl.bindTexture(gl.TEXTURE_2D, texObj);
-        // テクスチャへイメージを適用
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.ALPHA,
-                            size,size,0,
-                            gl.ALPHA, gl.UNSIGNED_BYTE, canvas);
-        // ミップマップを生成
-        gl.generateMipmap(gl.TEXTURE_2D);
-        // テクスチャのバインドを無効化
-        gl.bindTexture(gl.TEXTURE_2D, null);
-        return texObj;
-    }
-
-
-
 }

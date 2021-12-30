@@ -1,19 +1,12 @@
 import Game from './game.js';
 import RealScreen from './realscreen.js';
-import Controller from './controller.js';
 
 
 const main = ()=>{
-
-    // UI要素
-    RealScreen.initialize();
-
-    //const controller = new Controller();
-
-    const game = new Game( RealScreen );
-    game.start();
+    RealScreen.initialize(); // 画面の初期化
+    const game = new Game( RealScreen ); // ゲームの作成
+    game.start(); // ゲームの開始
 };
 
-
-// 開始
+// ページが読み込まれたら開始
 window.addEventListener('load',main,false);

@@ -1,5 +1,22 @@
 # 開発ドキュメント
 
+## ディレクトリ構成
+
+```
+- src/
+    - controller.js
+    - game.js
+    - glutil.js
+    - main.js
+    - offscreen.js
+    - realscreen.js
+    - scene_game.js
+    - scene_start.js
+    - scenebase.js
+    - strutil.js        : テキスト
+```
+
+## 諸々の仕組み
 
 ### 画面について
 
