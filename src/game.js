@@ -48,18 +48,27 @@ class SceneManager{
     }
 
     changeScene( sceneName, scene ) {
-        if( this.state!==null ){
+        if( this.state!==null ){ // 現在何らかのシーンを描画中であれば(ゲームが開始されているなら)シーンを終了
+            if(this.realScreen.isDebugMode) 
+                this.scenes[this.state].offScreen.closeDebugScreen();
             this.scenes[this.state].exit();
         }
-        if( !(sceneName in this.scenes) ){
+        if( !(sceneName in this.scenes) ){ // 移行対象のシーンがまだ存在していないなら作成
             this.scenes[sceneName] = new scene(this.realScreen, this.timer, this);
         }
-        this.state = sceneName;
-        this.scenes[this.state].enter();
+        this.state = sceneName; // 移行先のシーンを記憶
+        if(this.realScreen.isDebugMode){
+            const [H,W] = this.realScreen.getDebugScreenRealSize();
+            this.scenes[this.state].offScreen.openDebugScreen(H,W);
+        }
+        this.scenes[this.state].enter(); // シーンに入る
     }
 
     run() {
-        return this.scenes[this.state].render();
+        this.scenes[this.state].render();
+        if(this.scenes[this.state].offScreen.debugCanvas!==null){
+            this.scenes[this.state].debug_render();
+        }
     }
 }
 
@@ -67,8 +76,42 @@ class SceneManager{
 export default class Game{
     constructor( realScreen ) {
         this.timer = new GameTimer();
-        //controller.initialize( this.timer );
         this.sceneMg = new SceneManager( realScreen, this.timer );
+
+        this.nextFramePID = null;
+
+        this.isDebugMode = false;
+        this.debugCanvas = null;
+        this.debugContext = null;
+        window.addEventListener('keyup',(evt)=>{
+            if(evt.key==='q') this.toggleDebugMode();
+        },false);
+    }
+
+    toggleDebugMode() {
+        this.isDebugMode = !this.isDebugMode;
+        if(this.isDebugMode){
+            this.debugCanvas = document.createElement('canvas');
+            this.debugCanvas.width  = this.sceneMg.realScreen.canvas.width;
+            this.debugCanvas.height = this.sceneMg.realScreen.canvas.height;
+            this.debugContext = this.debugCanvas.getContext('2d');
+            this.debugContext.fillStyle = "rgb(255,0,0";
+            this.debugContext.fillRect(0,0,this.debugCanvas.width,this.debugCanvas.height);
+            this.sceneMg.realScreen.setDebugMode(this.isDebugMode, this.debugCanvas);
+        }else{
+            this.debugCanvas = null;
+            this.debugContext = null;
+            this.sceneMg.realScreen.setDebugMode(this.isDebugMode, null);
+        }
+    }
+    debug() {
+        if(this.debugCanvas.width!==this.sceneMg.realScreen.canvas.width)
+            this.debugCanvas.width = this.sceneMg.realScreen.canvas.width;
+        if(this.debugCanvas.height!==this.sceneMg.realScreen.canvas.height)
+            this.debugCanvas.height = this.sceneMg.realScreen.canvas.height;
+        
+        this.debugContext.fillStyle = "rgb(255,0,0";
+        this.debugContext.fillRect(0,0,this.debugCanvas.width,this.debugCanvas.height);
     }
 
     start() {
@@ -83,6 +126,12 @@ export default class Game{
         // 強制終了時刻を過ぎているとき、ゲームを終了する
         if( this.timer.require_end() ){ console.log('GAME END'); return; }
         // 次のフレームの処理を予約
-        window.setTimeout( ()=>this.routine(), this.timer.get_wait_time() );
+        this.nextFramePID = window.setTimeout( ()=>this.routine(), this.timer.get_wait_time() );
+        // ゲームのデバッグ情報表示
+        if(this.isDebugMode) this.debug();
+    }
+
+    force_end() {
+        window.clearTimeout(this.nextFramePID);
     }
 }

@@ -36,5 +36,11 @@ export default class SceneBase {
     render() {
         this.realScreen.renderOffScreen();
     }
+
+    debug_render() {
+        this.offScreen.debugContext.fillStyle = "rgb(0,255,0)";
+        this.offScreen.debugContext.fillRect(0,0,this.offScreen.debugCanvas.width,
+                                                    this.offScreen.debugCanvas.height);
+    }
 }
 
