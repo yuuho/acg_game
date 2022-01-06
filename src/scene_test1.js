@@ -1,8 +1,9 @@
+'use strict';
 
 import SceneBase from './scenebase.js';
 import GLUtil from './glutil.js';
 import StringUtil from './strutil.js';
-import {OffScreenHD} from './offscreen.js';
+import OffScreen from './offscreen.js';
 import {Controller} from './controller.js';
 // 遷移先
 import StartScene from './scene_start.js';
@@ -48,7 +49,8 @@ export default class Test1Scene extends SceneBase{
     static sceneName = "Test1";
 
     scene_initialize(){
-        this.offScreen = new OffScreenHD( this.realScreen );
+        const [w,h] = this.sceneMg.defaultScreenResolution;
+        this.offScreen = new OffScreen(h,w,'webgl2',false,false);
         this.controller = new Controller( this.timer );
 
         this.cursor = 0;
@@ -59,6 +61,21 @@ export default class Test1Scene extends SceneBase{
         this.gl = this.offScreen.context;
         this.program = GLUtil.createProgram(this.gl, vshader, fshader);
         this.gl.useProgram(this.program);
+
+
+        // テクスチャ生成
+        this.strings = [];
+        this.strings = this.strings.concat(['back with enter key']);
+        for(let i=0;i<this.menuList.length;i++){
+            this.strings = this.strings.concat([this.menuList[i].name]);
+        }
+        const stringPtr = this.gl.getUniformLocation(this.program, 'strings');
+        const [stringCvs,stringRatios]
+                    = StringUtil.multi_string_square(this.strings, 2048, 100);
+        const texObj = GLUtil.createTexture(this.gl, stringCvs,    2048);
+        this.gl.bindTexture(this.gl.TEXTURE_2D, texObj);
+        this.gl.uniform1i(stringPtr, 0);
+        this.stringRatios = stringRatios;
     }
 
     render() {
@@ -96,7 +113,6 @@ export default class Test1Scene extends SceneBase{
         this.cdata = []; this.cdim = 3; // 頂点カラー
         this.tdata = []; this.tdim = 2; // テクスチャ座標
         this.idata = [];
-        this.strings = [];
         // 設定
         this.depths = { 'back':0.5, 'btn':0.0, 'text':-0.5 };
 
@@ -141,16 +157,6 @@ export default class Test1Scene extends SceneBase{
 
         (()=>{ // 文字列
             ///// テクスチャ設定
-            array_append(this.strings, ['back with enter key']);
-            for(let i=0;i<this.menuList.length;i++){
-                array_append(this.strings, [this.menuList[i].name]);
-            }
-            const stringPtr = this.gl.getUniformLocation(this.program, 'strings');
-            const [stringCvs,stringRatios]
-                        = StringUtil.multi_string_square(this.strings, 2048, 100);
-            const texObj = GLUtil.createTexture(this.gl, stringCvs,    2048);
-            this.gl.bindTexture(this.gl.TEXTURE_2D, texObj);
-            this.gl.uniform1i(stringPtr, 0);
             const th = 1.0/this.strings.length;
     
             ///// タイトル
@@ -172,8 +178,8 @@ export default class Test1Scene extends SceneBase{
             const selectedColor    = [ 0.7,0.7,0.7, 0.7,0.7,0.7, 0.7,0.7,0.7, 0.7,0.7,0.7];
             const notSelectedColor = [ 0.8,0.3,0.3, 0.8,0.3,0.3, 0.8,0.3,0.3, 0.8,0.3,0.3];
             for(let i=0;i<this.menuList.length;i++){
-                const xl=xL*0.15*stringRatios[i+1];
-                const xr=xR*0.15*stringRatios[i+1];
+                const xl=xL*0.15*this.stringRatios[i+1];
+                const xr=xR*0.15*this.stringRatios[i+1];
                 array_append(this.vdata,
                     [ xl,yt-i*(h+hs)-0,this.depths.text, xr,yt-i*(h+hs)-0,this.depths.text,
                       xl,yt-i*(h+hs)-h,this.depths.text, xr,yt-i*(h+hs)-h,this.depths.text ]);
@@ -200,8 +206,5 @@ export default class Test1Scene extends SceneBase{
         this.gl.clear(this.gl.COLOR_BUFFER_BIT|this.gl.DEPTH_BUFFER_BIT);
         this.gl.drawElements(this.gl.TRIANGLES, this.idata.length, this.gl.UNSIGNED_SHORT, 0);
         this.gl.flush();
-
-        this.realScreen.renderOffScreen();
     }
-
 }

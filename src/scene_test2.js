@@ -1,8 +1,9 @@
+'use strict';
 
 import SceneBase from './scenebase.js';
 import GLUtil from './glutil.js';
 import StringUtil from './strutil.js';
-import {OffScreenFull} from './offscreen.js';
+import OffScreen from './offscreen.js';
 import {Controller} from './controller.js';
 // 遷移先
 import StartScene from './scene_start.js';
@@ -47,10 +48,11 @@ void main() {
 
 export default class Test2Scene extends SceneBase{
 
-    static sceneName = "Test2";
+    static sceneName = "FullScreen & SceneChange";
 
-    scene_initialize(){
-        this.offScreen = new OffScreenFull( this.realScreen );
+    scene_initialize() {
+        const [w,h] = this.sceneMg.defaultScreenResolution;
+        this.offScreen = new OffScreen(h,w, 'webgl2', false,false);
         this.controller = new Controller( this.timer );
 
         this.cursor = 0;
@@ -61,6 +63,17 @@ export default class Test2Scene extends SceneBase{
         this.gl = this.offScreen.context;
         this.program = GLUtil.createProgram(this.gl, vshader, fshader);
         this.gl.useProgram(this.program);
+
+        // 使用する文字列をテクスチャとして生成
+        this.strings = [];
+        this.strings = this.strings.concat(['back with enter key']);
+        this.strings = this.strings.concat(this.menuList.map(x=>x.name));
+        const stringPtr = this.gl.getUniformLocation(this.program, 'strings');
+        let stringCvs; [stringCvs, this.stringRatios]
+                    = StringUtil.multi_string_square(this.strings, 2048, 100);
+        const texObj = GLUtil.createTexture(this.gl, stringCvs,    2048);
+        this.gl.bindTexture(this.gl.TEXTURE_2D, texObj);
+        this.gl.uniform1i(stringPtr, 0);
     }
 
     render() {
@@ -88,19 +101,13 @@ export default class Test2Scene extends SceneBase{
                                       this.menuList[this.cursor].scene);
         }
 
-        /////////
-        (()=>{
-            const ratio = this.offScreen.canvas.width/this.offScreen.canvas.height;
-            const Xlim = ratio>16.0/9.0 ? ratio : 16.0/9.0;
-            const Ylim = ratio>16.0/9.0 ? 1.0   : (16.0/9.0)/ratio;
+        { // 描画範囲の座標限界を設定
+            [this.Xlim,this.Ylim,this.sXlim,this.sYlim] = this.offScreen.getXYlims();
             const XlimPtr = this.gl.getUniformLocation(this.program, 'Xlim');
             const YlimPtr = this.gl.getUniformLocation(this.program, 'Ylim');
-            this.gl.uniform1f(XlimPtr, Xlim);
-            this.gl.uniform1f(YlimPtr, Ylim);
-        })();
-        
-
-        /////////
+            this.gl.uniform1f(XlimPtr, this.Xlim);
+            this.gl.uniform1f(YlimPtr, this.Ylim);
+        }
 
         let tmpIDX = 0;
         const array_append = (arr1,arr2)=>Array.prototype.push.apply(arr1,arr2);
@@ -110,11 +117,10 @@ export default class Test2Scene extends SceneBase{
         this.cdata = []; this.cdim = 3; // 頂点カラー
         this.tdata = []; this.tdim = 2; // テクスチャ座標
         this.idata = [];
-        this.strings = [];
         // 設定
         this.depths = { 'back':0.5, 'btn':0.0, 'text':-0.5 };
 
-        (()=>{ // 背景データの作成
+        { // 背景データの作成
             const x = Math.sin( this.timer.tmpTime*0.003 );
             const y = Math.cos( this.timer.tmpTime*0.003 );
             const r0=0.2, r1=0.15, r2=0.1, r3=0.14;
@@ -132,9 +138,9 @@ export default class Test2Scene extends SceneBase{
                 [ tmpIDX+0, tmpIDX+1, tmpIDX+2,
                   tmpIDX+2, tmpIDX+3, tmpIDX+0 ]);
             tmpIDX += 4;
-        })();
+        }
 
-        (()=>{ // ボタン背景の描画
+        { // ボタン背景の描画
             const xl=-0.3, xr=0.3;
             const yt=0.2, h=0.15, hs=0.05;
             const selectedColor    = [ 0.3,0.3,0.8, 0.3,0.3,0.8, 0.3,0.3,0.8, 0.3,0.3,0.8];
@@ -151,20 +157,9 @@ export default class Test2Scene extends SceneBase{
                     [ tmpIDX+0, tmpIDX+1, tmpIDX+2, tmpIDX+2, tmpIDX+3, tmpIDX+1 ]);
                 tmpIDX += 4;
             }
-        })();
+        }
 
-        (()=>{ // 文字列
-            ///// テクスチャ設定
-            array_append(this.strings, ['back with enter key']);
-            for(let i=0;i<this.menuList.length;i++){
-                array_append(this.strings, [this.menuList[i].name]);
-            }
-            const stringPtr = this.gl.getUniformLocation(this.program, 'strings');
-            const [stringCvs,stringRatios]
-                        = StringUtil.multi_string_square(this.strings, 2048, 100);
-            const texObj = GLUtil.createTexture(this.gl, stringCvs,    2048);
-            this.gl.bindTexture(this.gl.TEXTURE_2D, texObj);
-            this.gl.uniform1i(stringPtr, 0);
+        { // 文字列
             const th = 1.0/this.strings.length;
     
             ///// タイトル
@@ -186,8 +181,8 @@ export default class Test2Scene extends SceneBase{
             const selectedColor    = [ 0.7,0.7,0.7, 0.7,0.7,0.7, 0.7,0.7,0.7, 0.7,0.7,0.7];
             const notSelectedColor = [ 0.8,0.3,0.3, 0.8,0.3,0.3, 0.8,0.3,0.3, 0.8,0.3,0.3];
             for(let i=0;i<this.menuList.length;i++){
-                const xl=xL*0.15*stringRatios[i+1];
-                const xr=xR*0.15*stringRatios[i+1];
+                const xl=xL*0.15*this.stringRatios[i+1];
+                const xr=xR*0.15*this.stringRatios[i+1];
                 array_append(this.vdata,
                     [ xl,yt-i*(h+hs)-0,this.depths.text, xr,yt-i*(h+hs)-0,this.depths.text,
                       xl,yt-i*(h+hs)-h,this.depths.text, xr,yt-i*(h+hs)-h,this.depths.text ]);
@@ -199,7 +194,7 @@ export default class Test2Scene extends SceneBase{
                     [ tmpIDX+0, tmpIDX+1, tmpIDX+2, tmpIDX+2, tmpIDX+3, tmpIDX+1 ]);
                 tmpIDX += 4;
             }
-        })();
+        }
 
         this.vbo = GLUtil.createVBO(this.gl, this.vdata);
         this.cbo = GLUtil.createVBO(this.gl, this.cdata);
@@ -214,28 +209,29 @@ export default class Test2Scene extends SceneBase{
         this.gl.clear(this.gl.COLOR_BUFFER_BIT|this.gl.DEPTH_BUFFER_BIT);
         this.gl.drawElements(this.gl.TRIANGLES, this.idata.length, this.gl.UNSIGNED_SHORT, 0);
 
-        (()=>{ // セーフティゾーンの描画
-            const d1 = 0.01, d2 = 0.02, r = 16.0/9.0;
-            const vbo = GLUtil.createVBO(this.gl, [-r+d1, 1.0-d1,-1.0,  r-d1, 1.0-d1,-1.0,
-                                                   -r+d1,-1.0+d1,-1.0,  r-d1,-1.0+d1,-1.0,
+        { // セーフティゾーンの描画
+            const d0=0.02, d1 = 0.03, d2 = 0.04;
+            const vbo = GLUtil.createVBO(this.gl, [-this.sXlim+d1, this.sYlim-d1,-1.0,  this.sXlim-d1, this.sYlim-d1,-1.0,
+                                                   -this.sXlim+d1,-this.sYlim+d1,-1.0,  this.sXlim-d1,-this.sYlim+d1,-1.0,
                                                    -1.0+d2, 1.0-d2,-1.0, 1.0-d2, 1.0-d2,-1.0,
-                                                   -1.0+d2,-1.0+d2,-1.0, 1.0-d2,-1.0+d2,-1.0]);
+                                                   -1.0+d2,-1.0+d2,-1.0, 1.0-d2,-1.0+d2,-1.0,
+                                                   -this.Xlim+d0, this.Ylim-d0,-1.0, this.Xlim-d0, this.Ylim-d0,-1.0,
+                                                   -this.Xlim+d0,-this.Ylim+d0,-1.0, this.Xlim-d0,-this.Ylim+d0,-1.0]);
             const cbo = GLUtil.createVBO(this.gl, [1.0,0.0,0.0, 1.0,0.0,0.0, 1.0,0.0,0.0, 1.0,0.0,0.0,
-                                                   0.0,0.0,1.0, 0.0,0.0,1.0, 0.0,0.0,1.0, 0.0,0.0,1.0 ]);
+                                                   0.0,0.0,1.0, 0.0,0.0,1.0, 0.0,0.0,1.0, 0.0,0.0,1.0,
+                                                   0.0,1.0,0.0, 0.0,1.0,0.0, 0.0,1.0,0.0, 0.0,1.0,0.0 ]);
             const tbo = GLUtil.createVBO(this.gl, [-1.0,-1.0, -1.0,-1.0, -1.0,-1.0, -1.0,-1.0,
+                                                   -1.0,-1.0, -1.0,-1.0, -1.0,-1.0, -1.0,-1.0,
                                                    -1.0,-1.0, -1.0,-1.0, -1.0,-1.0, -1.0,-1.0 ]);
-            const ibo = GLUtil.createIBO(this.gl, [0,1, 0,2, 1,3, 2,3,  4,5, 4,6, 5,7, 6,7]);
+            const idata = [0,1, 0,2, 1,3, 2,3,  4,5, 4,6, 5,7, 6,7,  8,9, 8,10, 9,11, 10,11];
+            const ibo = GLUtil.createIBO(this.gl, idata);
             GLUtil.sendVBO(this.gl, this.program, 'pos',  vbo, 3 /*= VBO dim*/);
             GLUtil.sendVBO(this.gl, this.program, 'coli', cbo, 3 /*= VBO dim*/);
             GLUtil.sendVBO(this.gl, this.program, 'tpos', tbo, 2 /*= VBO dim*/);
             GLUtil.sendIBO(this.gl, ibo );
-            this.gl.drawElements(this.gl.LINES, 16, this.gl.UNSIGNED_SHORT, 0);
-        })();
-
+            this.gl.drawElements(this.gl.LINES, idata.length, this.gl.UNSIGNED_SHORT, 0);
+        }
 
         this.gl.flush();
-
-        this.realScreen.renderOffScreen();
     }
-
 }

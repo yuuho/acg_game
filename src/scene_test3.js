@@ -1,8 +1,9 @@
+'use strict';
 
 import SceneBase from './scenebase.js';
 import GLUtil from './glutil.js';
 import StringUtil from './strutil.js';
-import {OffScreenHD} from './offscreen.js';
+import OffScreen from './offscreen.js';
 import {Controller} from './controller.js';
 // 遷移先
 import StartScene from './scene_start.js';
@@ -48,7 +49,7 @@ export default class Test3Scene extends SceneBase{
     static sceneName = "Test3";
 
     scene_initialize() {
-        this.offScreen = new OffScreenHD( this.realScreen );
+        this.offScreen = new OffScreen(720,1280);
         this.controller = new Controller( this.timer );
 
         this.cursor = 0;
@@ -199,8 +200,5 @@ export default class Test3Scene extends SceneBase{
         this.gl.clear(this.gl.COLOR_BUFFER_BIT|this.gl.DEPTH_BUFFER_BIT);
         this.gl.drawElements(this.gl.TRIANGLES, this.idata.length, this.gl.UNSIGNED_SHORT, 0);
         this.gl.flush();
-
-        this.realScreen.renderOffScreen();
     }
-
 }
