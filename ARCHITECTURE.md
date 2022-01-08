@@ -10,11 +10,22 @@
     - main.js
     - offscreen.js
     - realscreen.js
+    - scene_config.js
     - scene_game.js
     - scene_start.js
+    - scene_test1.js
+    - scene_test2.js
     - scenebase.js
     - strutil.js        : テキスト
+- favicon.ico            : アイコン
+- icon-152x152.png       : アイコン
+- icon-192x192.png       : アイコン
+- icon-512x512.png       : アイコン
+- index.html    : ファイルを追加したらここに書く
+- manifest.json : 編集不要
+- sw.js         : ファイルを追加したらここに書く
 ```
+
 
 ## 諸々の仕組み
 

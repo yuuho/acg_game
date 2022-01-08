@@ -9,7 +9,7 @@ import {Controller} from './controller.js';
 import GameScene from './scene_game.js';
 import Test1Scene from './scene_test1.js';
 import Test2Scene from './scene_test2.js';
-import Test3Scene from './scene_test3.js';
+import ConfigScene from './scene_config.js';
 
 
 const vshader = `\
@@ -59,10 +59,10 @@ export default class StartScene extends SceneBase{
         this.cursor = 0;
         this.ctrlHist = {'ArrowUp':{}, 'ArrowDown':{}, 'Enter':{}};
 
-        this.menuList = [{'name':'GAME START',      'scene':GameScene},
-                         {'name':'controller test', 'scene':Test1Scene},
-                         {'name':'test scene',      'scene':Test2Scene},
-                         {'name':'CONFIG',          'scene':Test3Scene},]
+        this.menuList = [{'name':'GAME START',       'scene':GameScene},
+                         {'name':'CONTROLLER CHECK', 'scene':Test1Scene},
+                         {'name':'DISPLAY CHECK',    'scene':Test2Scene},
+                         {'name':'CONFIG',           'scene':ConfigScene},]
 
         this.gl = this.offScreen.context;
         this.program = GLUtil.createProgram(this.gl, vshader, fshader);
@@ -74,8 +74,8 @@ export default class StartScene extends SceneBase{
         this.strings = this.strings.concat(['GAME TITLE']);
         this.strings = this.strings.concat(this.menuList.map(x=>x.name));
         const stringPtr = this.gl.getUniformLocation(this.program, 'strings');
-        let stringCvs; [stringCvs, this.stringRatios]
-                    = StringUtil.multi_string_square(this.strings, 2048, 100);
+        let stringCvs; [stringCvs, this.texPoss, this.strDatas]
+                            = StringUtil.get_string_texture( this.strings, 2048 );
         const texObj = GLUtil.createTexture(this.gl, stringCvs,    2048);
         this.gl.bindTexture(this.gl.TEXTURE_2D, texObj);
         this.gl.uniform1i(stringPtr, 0);
@@ -166,9 +166,7 @@ export default class StartScene extends SceneBase{
             }
         }
 
-        { // 文字列
-            const th = 1.0/this.strings.length;
-    
+        { // 文字列    
             // タイトル
             const XL=-0.35, XR=0.35, YT=0.5, YB=0.3;
             this.vdata = this.vdata.concat(
@@ -176,27 +174,25 @@ export default class StartScene extends SceneBase{
                   XL,YB,this.depths.text, XR,YB,this.depths.text ]);
             this.cdata = this.cdata.concat(
                 [ 1.0,1.0,1.0, 1.0,1.0,1.0, 1.0,1.0,1.0, 1.0,1.0,1.0 ] );
-            this.tdata = this.tdata.concat(
-                [ 0.0,0.0, 1.0,0.0, 0.0,th, 1.0,th ] );
+            this.tdata = this.tdata.concat( this.texPoss[0] );
             this.idata = this.idata.concat(
                 [ tmpIDX+0, tmpIDX+1, tmpIDX+2, tmpIDX+2, tmpIDX+3, tmpIDX+1 ]);
             tmpIDX += 4;
 
             // ボタン
             const xL=-0.3, xR=0.3;
-            const yt=0.2, h=0.15, hs=0.05;
+            const yt=0.18, h=0.12, hs=0.08;
             const selectedColor    = [ 0.7,0.7,0.7, 0.7,0.7,0.7, 0.7,0.7,0.7, 0.7,0.7,0.7];
             const notSelectedColor = [ 0.8,0.3,0.3, 0.8,0.3,0.3, 0.8,0.3,0.3, 0.8,0.3,0.3];
             for(let i=0;i<this.menuList.length;i++){
-                const xl=xL*0.12*this.stringRatios[i+1];
-                const xr=xR*0.12*this.stringRatios[i+1];
+                const xl= xL*0.0011*this.strDatas[i+1].width;
+                const xr= xR*0.0011*this.strDatas[i+1].width;
                 this.vdata = this.vdata.concat(
                     [ xl,yt-i*(h+hs)-0,this.depths.text, xr,yt-i*(h+hs)-0,this.depths.text,
                       xl,yt-i*(h+hs)-h,this.depths.text, xr,yt-i*(h+hs)-h,this.depths.text ]);
                 this.cdata = this.cdata.concat(
                     this.cursor===i ? selectedColor : notSelectedColor );
-                this.tdata = this.tdata.concat(
-                    [ 0.0,th*(i+1), 1.0,th*(i+1), 0.0,th*(i+2), 1.0,th*(i+2) ] );
+                this.tdata = this.tdata.concat( this.texPoss[i+1] );
                 this.idata = this.idata.concat(
                     [ tmpIDX+0, tmpIDX+1, tmpIDX+2, tmpIDX+2, tmpIDX+3, tmpIDX+1 ]);
                 tmpIDX += 4;

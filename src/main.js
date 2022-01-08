@@ -16,4 +16,3 @@ const main = ()=>{
 
 // ページが読み込まれたら開始
 window.addEventListener('load',main,false);
- 

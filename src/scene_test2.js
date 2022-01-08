@@ -77,28 +77,31 @@ export default class Test2Scene extends SceneBase{
     }
 
     render() {
-
-        // どこを選択しているか把握
-        let cursordiff = 0;
-        let enter = false;
-        for(let key in this.ctrlHist){
-            if(this.controller.KeyBoard[key].length===0) continue;
-            for(let i=this.controller.KeyBoard[key].length-1;i>=0;i--){
-                if(!('end' in this.controller.KeyBoard[key][i])) break;
-                const id = this.controller.KeyBoard[key][i].start+
-                                '_'+this.controller.KeyBoard[key][i].end;
-                if(id in this.ctrlHist[key]) break;
-                this.ctrlHist[key][id] = 'done';
-                if(key==='ArrowUp')         cursordiff -= 1;
-                else if(key==='ArrowDown')  cursordiff += 1;
-                else                        enter = true;
+        { // カーソル位置(どこを選択しているか)把握
+            let cursordiff = 0;
+            let enter = false;
+            for(let key in this.ctrlHist){ // このシーンで受け付ける種類のキーについて処理していく
+                if(this.controller.KeyBoard[key].length===0) continue; // キーが押されていないなら処理の必要なし
+                for(let i=this.controller.KeyBoard[key].length-1;i>=0;i--){ // 最新のキー入力から処理していく
+                    if(!('end' in this.controller.KeyBoard[key][i])) continue;// まだ押しっぱなしのキーなら無視
+                    const id = this.controller.KeyBoard[key][i].start+        // そのキー入力固有のIDを作成
+                                    '_'+this.controller.KeyBoard[key][i].end; //   (キー押し->離し時刻で)
+                    if(id in this.ctrlHist[key]) break; // このシーンでもう処理済みのキー入力なら無視
+                    this.ctrlHist[key][id] = 'done'; // このシーンでもう処理したキー入力として記憶
+                    if(key==='ArrowUp')         cursordiff -= 1; // ↑
+                    else if(key==='ArrowDown')  cursordiff += 1; // ↓
+                    else                        enter = true;    // Enter
+                }
             }
-        }
-        this.cursor = (this.cursor+cursordiff+this.menuList.length*10)%this.menuList.length;
-        if(enter){
-            console.log(this.menuList[this.cursor].name);
-            this.sceneMg.changeScene( this.menuList[this.cursor].scene.sceneName,
-                                      this.menuList[this.cursor].scene);
+            // 現在のカーソル位置を求める
+            this.cursor = ( (this.cursor+cursordiff)%this.menuList.length
+                                +this.menuList.length)%this.menuList.length;
+            // エンターキーをが押されていたならシーン変更
+            if(enter){
+                console.log(this.menuList[this.cursor].name);
+                this.sceneMg.changeScene( this.menuList[this.cursor].scene.sceneName,
+                                        this.menuList[this.cursor].scene);
+            }
         }
 
         { // 描画範囲の座標限界を設定
@@ -109,14 +112,12 @@ export default class Test2Scene extends SceneBase{
             this.gl.uniform1f(YlimPtr, this.Ylim);
         }
 
+        // 描画オブジェクトデータ
         let tmpIDX = 0;
-        const array_append = (arr1,arr2)=>Array.prototype.push.apply(arr1,arr2);
-
-        // vbo, cbo, tbo, ibo
         this.vdata = []; this.vdim = 3; // 頂点座標
         this.cdata = []; this.cdim = 3; // 頂点カラー
         this.tdata = []; this.tdim = 2; // テクスチャ座標
-        this.idata = [];
+        this.idata = []; this.idataL = []; // 三角形と線のインデックスバッファ
         // 設定
         this.depths = { 'back':0.5, 'btn':0.0, 'text':-0.5 };
 
@@ -124,17 +125,17 @@ export default class Test2Scene extends SceneBase{
             const x = Math.sin( this.timer.tmpTime*0.003 );
             const y = Math.cos( this.timer.tmpTime*0.003 );
             const r0=0.2, r1=0.15, r2=0.1, r3=0.14;
-            array_append(this.vdata,
+            this.vdata = this.vdata.concat(
                 [ 1.0+r0*(x+1.0),  1.0+r0*(y+1.0), this.depths.back,
                   1.0+r1*(x+1.0), -1.0+r1*(y-1.0), this.depths.back,
                  -1.0+r2*(x-1.0), -1.0+r2*(y-1.0), this.depths.back,
                  -1.0+r3*(x-1.0),  1.0+r3*(y+1.0), this.depths.back,
                 ]);
-            array_append(this.cdata,
+            this.cdata = this.cdata.concat(
                 [ 1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0, 1.0,0.0,1.0 ]);
-            array_append(this.tdata,
+            this.tdata = this.tdata.concat(
                 [ -1.0,-1.0, -1.0,-1.0, -1.0,-1.0, -1.0,-1.0 ]); // none
-            array_append(this.idata,
+            this.idata = this.idata.concat(
                 [ tmpIDX+0, tmpIDX+1, tmpIDX+2,
                   tmpIDX+2, tmpIDX+3, tmpIDX+0 ]);
             tmpIDX += 4;
@@ -146,14 +147,14 @@ export default class Test2Scene extends SceneBase{
             const selectedColor    = [ 0.3,0.3,0.8, 0.3,0.3,0.8, 0.3,0.3,0.8, 0.3,0.3,0.8];
             const notSelectedColor = [ 0.7,0.7,0.7, 0.7,0.7,0.7, 0.7,0.7,0.7, 0.7,0.7,0.7];
             for(let i=0;i<this.menuList.length;i++){
-                array_append(this.vdata,
+                this.vdata = this.vdata.concat(
                     [ xl,yt-i*(h+hs)-0,this.depths.btn, xr,yt-i*(h+hs)-0,this.depths.btn,
                       xl,yt-i*(h+hs)-h,this.depths.btn, xr,yt-i*(h+hs)-h,this.depths.btn ]);
-                array_append(this.cdata,
+                this.cdata = this.cdata.concat(
                     this.cursor===i ? selectedColor : notSelectedColor );
-                array_append(this.tdata,
+                this.tdata = this.tdata.concat(
                     [ -1.0,-1.0, -1.0,-1.0, -1.0,-1.0, -1.0,-1.0 ] ); // none
-                array_append(this.idata,
+                this.idata = this.idata.concat(
                     [ tmpIDX+0, tmpIDX+1, tmpIDX+2, tmpIDX+2, tmpIDX+3, tmpIDX+1 ]);
                 tmpIDX += 4;
             }
@@ -162,75 +163,95 @@ export default class Test2Scene extends SceneBase{
         { // 文字列
             const th = 1.0/this.strings.length;
     
-            ///// タイトル
-            const XL=-0.35, XR=0.35, YT=0.5, YB=0.3;
-            array_append(this.vdata,
+            // メッセージ
+            const XL=-0.7, XR=0.7, YT=0.5, YB=0.3;
+            this.vdata = this.vdata.concat(
                 [ XL,YT,this.depths.text, XR,YT,this.depths.text,
                   XL,YB,this.depths.text, XR,YB,this.depths.text ]);
-            array_append(this.cdata,
+            this.cdata = this.cdata.concat(
                 [ 1.0,1.0,1.0, 1.0,1.0,1.0, 1.0,1.0,1.0, 1.0,1.0,1.0 ] );
-            array_append(this.tdata,
+            this.tdata = this.tdata.concat(
                 [ 0.0,0.0, 1.0,0.0, 0.0,th, 1.0,th ] );
-            array_append(this.idata,
+            this.idata = this.idata.concat(
                 [ tmpIDX+0, tmpIDX+1, tmpIDX+2, tmpIDX+2, tmpIDX+3, tmpIDX+1 ]);
             tmpIDX += 4;
 
-            ///// ボタン
-            const xL=-0.3, xR=0.3;
+            // ボタン
+            const xL=-0.5, xR=0.5;
             const yt=0.2, h=0.15, hs=0.05;
             const selectedColor    = [ 0.7,0.7,0.7, 0.7,0.7,0.7, 0.7,0.7,0.7, 0.7,0.7,0.7];
             const notSelectedColor = [ 0.8,0.3,0.3, 0.8,0.3,0.3, 0.8,0.3,0.3, 0.8,0.3,0.3];
             for(let i=0;i<this.menuList.length;i++){
                 const xl=xL*0.15*this.stringRatios[i+1];
                 const xr=xR*0.15*this.stringRatios[i+1];
-                array_append(this.vdata,
+                this.vdata = this.vdata.concat(
                     [ xl,yt-i*(h+hs)-0,this.depths.text, xr,yt-i*(h+hs)-0,this.depths.text,
                       xl,yt-i*(h+hs)-h,this.depths.text, xr,yt-i*(h+hs)-h,this.depths.text ]);
-                array_append(this.cdata,
+                this.cdata = this.cdata.concat(
                     this.cursor===i ? selectedColor : notSelectedColor );
-                array_append(this.tdata,
+                this.tdata = this.tdata.concat(
                     [ 0.0,th*(i+1), 1.0,th*(i+1), 0.0,th*(i+2), 1.0,th*(i+2) ] );
-                array_append(this.idata,
+                this.idata = this.idata.concat(
                     [ tmpIDX+0, tmpIDX+1, tmpIDX+2, tmpIDX+2, tmpIDX+3, tmpIDX+1 ]);
                 tmpIDX += 4;
             }
         }
 
+        { // 各種エリア境界の描画
+            // それぞれのマージン
+            const d0=0.02, d1 = 0.03, d2 = 0.04;
+
+            // セーフティゾーン
+            this.vdata = this.vdata.concat(
+                [ -this.sXlim+d1, this.sYlim-d1,-1.0,  this.sXlim-d1, this.sYlim-d1,-1.0,
+                  -this.sXlim+d1,-this.sYlim+d1,-1.0,  this.sXlim-d1,-this.sYlim+d1,-1.0]);
+            this.cdata = this.cdata.concat(
+                [1.0,0.0,0.0, 1.0,0.0,0.0, 1.0,0.0,0.0, 1.0,0.0,0.0]);
+            this.tdata = this.tdata.concat(
+                [-1.0,-1.0, -1.0,-1.0, -1.0,-1.0, -1.0,-1.0]);
+            this.idataL = this.idataL.concat(
+                [ tmpIDX+0,tmpIDX+1, tmpIDX+0,tmpIDX+2, tmpIDX+1,tmpIDX+3, tmpIDX+2,tmpIDX+3 ]);
+            tmpIDX += 4;
+
+            // 正方形[-1.0,+1.0]
+            this.vdata = this.vdata.concat(
+                [ -1.0+d2, 1.0-d2,-1.0, 1.0-d2, 1.0-d2,-1.0,
+                  -1.0+d2,-1.0+d2,-1.0, 1.0-d2,-1.0+d2,-1.0]);
+            this.cdata = this.cdata.concat(
+                [0.0,0.0,1.0, 0.0,0.0,1.0, 0.0,0.0,1.0, 0.0,0.0,1.0]);
+            this.tdata = this.tdata.concat(
+                [-1.0,-1.0, -1.0,-1.0, -1.0,-1.0, -1.0,-1.0]);
+            this.idataL = this.idataL.concat(
+                [ tmpIDX+0,tmpIDX+1, tmpIDX+0,tmpIDX+2, tmpIDX+1,tmpIDX+3, tmpIDX+2,tmpIDX+3 ]);
+            tmpIDX += 4;
+
+            // 描画エリア全体
+            this.vdata = this.vdata.concat(
+                [ -this.Xlim+d0, this.Ylim-d0,-1.0, this.Xlim-d0, this.Ylim-d0,-1.0,
+                  -this.Xlim+d0,-this.Ylim+d0,-1.0, this.Xlim-d0,-this.Ylim+d0,-1.0]);
+            this.cdata = this.cdata.concat(
+                [0.0,1.0,0.0, 0.0,1.0,0.0, 0.0,1.0,0.0, 0.0,1.0,0.0]);
+            this.tdata = this.tdata.concat(
+                [-1.0,-1.0, -1.0,-1.0, -1.0,-1.0, -1.0,-1.0]);
+            this.idataL = this.idataL.concat(
+                [ tmpIDX+0,tmpIDX+1, tmpIDX+0,tmpIDX+2, tmpIDX+1,tmpIDX+3, tmpIDX+2,tmpIDX+3 ]);
+            tmpIDX += 4;
+        }
+
+        // 描画処理
         this.vbo = GLUtil.createVBO(this.gl, this.vdata);
         this.cbo = GLUtil.createVBO(this.gl, this.cdata);
         this.tbo = GLUtil.createVBO(this.gl, this.tdata);
         this.ibo = GLUtil.createIBO(this.gl, this.idata);
+        this.iboL= GLUtil.createIBO(this.gl, this.idataL);
         GLUtil.sendVBO(this.gl, this.program, 'pos',  this.vbo, this.vdim /*= VBO dim*/);
         GLUtil.sendVBO(this.gl, this.program, 'coli', this.cbo, this.cdim /*= VBO dim*/);
         GLUtil.sendVBO(this.gl, this.program, 'tpos', this.tbo, this.tdim /*= VBO dim*/);
-        GLUtil.sendIBO(this.gl, this.ibo );
-
-        // 描画処理
         this.gl.clear(this.gl.COLOR_BUFFER_BIT|this.gl.DEPTH_BUFFER_BIT);
+        GLUtil.sendIBO(this.gl, this.ibo );
         this.gl.drawElements(this.gl.TRIANGLES, this.idata.length, this.gl.UNSIGNED_SHORT, 0);
-
-        { // セーフティゾーンの描画
-            const d0=0.02, d1 = 0.03, d2 = 0.04;
-            const vbo = GLUtil.createVBO(this.gl, [-this.sXlim+d1, this.sYlim-d1,-1.0,  this.sXlim-d1, this.sYlim-d1,-1.0,
-                                                   -this.sXlim+d1,-this.sYlim+d1,-1.0,  this.sXlim-d1,-this.sYlim+d1,-1.0,
-                                                   -1.0+d2, 1.0-d2,-1.0, 1.0-d2, 1.0-d2,-1.0,
-                                                   -1.0+d2,-1.0+d2,-1.0, 1.0-d2,-1.0+d2,-1.0,
-                                                   -this.Xlim+d0, this.Ylim-d0,-1.0, this.Xlim-d0, this.Ylim-d0,-1.0,
-                                                   -this.Xlim+d0,-this.Ylim+d0,-1.0, this.Xlim-d0,-this.Ylim+d0,-1.0]);
-            const cbo = GLUtil.createVBO(this.gl, [1.0,0.0,0.0, 1.0,0.0,0.0, 1.0,0.0,0.0, 1.0,0.0,0.0,
-                                                   0.0,0.0,1.0, 0.0,0.0,1.0, 0.0,0.0,1.0, 0.0,0.0,1.0,
-                                                   0.0,1.0,0.0, 0.0,1.0,0.0, 0.0,1.0,0.0, 0.0,1.0,0.0 ]);
-            const tbo = GLUtil.createVBO(this.gl, [-1.0,-1.0, -1.0,-1.0, -1.0,-1.0, -1.0,-1.0,
-                                                   -1.0,-1.0, -1.0,-1.0, -1.0,-1.0, -1.0,-1.0,
-                                                   -1.0,-1.0, -1.0,-1.0, -1.0,-1.0, -1.0,-1.0 ]);
-            const idata = [0,1, 0,2, 1,3, 2,3,  4,5, 4,6, 5,7, 6,7,  8,9, 8,10, 9,11, 10,11];
-            const ibo = GLUtil.createIBO(this.gl, idata);
-            GLUtil.sendVBO(this.gl, this.program, 'pos',  vbo, 3 /*= VBO dim*/);
-            GLUtil.sendVBO(this.gl, this.program, 'coli', cbo, 3 /*= VBO dim*/);
-            GLUtil.sendVBO(this.gl, this.program, 'tpos', tbo, 2 /*= VBO dim*/);
-            GLUtil.sendIBO(this.gl, ibo );
-            this.gl.drawElements(this.gl.LINES, idata.length, this.gl.UNSIGNED_SHORT, 0);
-        }
+        GLUtil.sendIBO(this.gl, this.iboL );
+        this.gl.drawElements(this.gl.LINES, this.idataL.length, this.gl.UNSIGNED_SHORT, 0);
 
         this.gl.flush();
     }

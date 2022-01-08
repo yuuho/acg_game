@@ -44,7 +44,7 @@ void main() {
 
 
 
-export default class Test3Scene extends SceneBase{
+export default class ConfigScene extends SceneBase{
 
     static sceneName = "Test3";
 
@@ -53,13 +53,29 @@ export default class Test3Scene extends SceneBase{
         this.controller = new Controller( this.timer );
 
         this.cursor = 0;
-        this.ctrlHist = {'ArrowUp':{}, 'ArrowDown':{}, 'Enter':{}};
+        this.ctrlHist = {'ArrowUp':{}, 'ArrowDown':{},
+                         'ArrowLeft':{}, 'ArrowRight':{}, 'Enter':{}};
 
-        this.menuList = [ {'name':'back', 'scene':StartScene} ]
+        this.menuList = [ {'name':'BACK TO DEFAULT'},
+                          {'name':'Discard Changes & Exit', 'scene':StartScene },
+                          {'name':'Save Changes & Exit',    'scene':StartScene } ]
 
         this.gl = this.offScreen.context;
         this.program = GLUtil.createProgram(this.gl, vshader, fshader);
         this.gl.useProgram(this.program);
+
+
+
+        const settingStrings = {
+            "Display Resolution" : ["Low", "Middle", "High", "Super"],
+            "Game Resolution"    : ["Eco mode (640x360)", "QHD (960x640)",
+                                    "HD (1280x720)", "WQHD (2560x1440)", "4K (3840x2160)"],
+            "Texture Resolution" : ["512", "1024", "2048"],
+            "Frame Rate"         : ["30", "60", "90"]
+        };
+
+
+
     }
 
     render() {
