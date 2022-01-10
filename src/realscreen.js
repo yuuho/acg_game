@@ -12,6 +12,9 @@ function windowResize( screenObj ){
         const k = Math.sqrt(screenObj.pixellimit/(rawH*rawW));
         H = screenObj.canvas.height = parseInt(k*rawH);
         W = screenObj.canvas.width  = parseInt(k*rawW);
+    }else{
+        H = rawH;
+        W = rawW;
     }
     
     // 仮想画面にサイズ変更を知らせる
@@ -52,10 +55,11 @@ class RealScreen{
 
     constructor() { /* Singleton */ }
 
-    initialize( pixellimit ) { // Singleton Constructor
+    initialize( gameConfigObj ) { // Singleton Constructor
         this.isDebugMode = false;
         this.gameDebugScreen = null;
-        this.pixellimit = pixellimit;
+        this.gameConfigObj = gameConfigObj;
+        this.pixellimit = this.gameConfigObj.displayResolution;
 
         // ページ全体の CSS 設定
         document.documentElement.style.margin = '0';
@@ -73,7 +77,6 @@ class RealScreen{
 
         // ブラウザウィンドウサイズが変更されたときのイベントを設定
         // 短い時間でリサイズイベントを受け取り過ぎたときは最新のものだけを実行する
-        this.offScreen = null;
         this.scene = null;
         this.renderPosition = {'ltx'  : 0, 'lty'  : 0, 'w'  : 0, 'h'  : 0,
                                'ltxDs': 0, 'ltyDs': 0, 'wDs': 0, 'hDs': 0,
@@ -125,6 +128,13 @@ class RealScreen{
 
     // 仮想画面を実画面に描画する関数
     render() {
+        // 画面解像度の設定が変更されていたら
+        if(this.gameConfigObj.displayResolution!==this.pixellimit){
+            this.pixellimit = this.gameConfigObj.displayResolution;
+            windowResize(this);
+            return;
+        }
+
         // 一度画面全体を黒く塗りつぶしてからシーンの仮想画面を描画
         this.context.fillRect(0,0,this.canvas.width,this.canvas.height);
         this.context.drawImage( this.scene.offScreen.canvas,

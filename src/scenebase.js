@@ -24,7 +24,9 @@ export default class SceneBase {
     scene_initialize() {
         throw new Error('You have to implement this method "scene_initialize()" in child method.');
         /* like this ↓
-        const [w,h] = this.sceneMg.defaultScreenResolution;
+        this.gameResolution = this.sceneMg.config.gameResolution;
+        this.textureResolution = this.sceneMg.config.textureResolution;
+        const [w,h] = this.gameResolution;
         this.offScreen = new OffScreen( h,w );
         this.controller = new Controller( this.timer );
         */

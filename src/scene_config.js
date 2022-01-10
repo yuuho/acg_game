@@ -49,10 +49,14 @@ export default class ConfigScene extends SceneBase{
     static sceneName = "Test3";
 
     scene_initialize() {
-        this.offScreen = new OffScreen(720,1280);
+        this.gameResolution = this.sceneMg.config.gameResolution;
+        this.textureResolution = this.sceneMg.config.textureResolution;
+        const [w,h] = this.gameResolution;
+        this.offScreen = new OffScreen(h,w);
         this.controller = new Controller( this.timer );
 
         this.cursor = 0;
+        this.subcursor = 0;
         this.ctrlHist = {'ArrowUp':{}, 'ArrowDown':{},
                          'ArrowLeft':{}, 'ArrowRight':{}, 'Enter':{}};
 
@@ -67,17 +71,19 @@ export default class ConfigScene extends SceneBase{
 
 
         const settingStrings = {
-            "Display Resolution" : ["Low", "Middle", "High", "Super"],
-            "Game Resolution"    : ["Eco mode (640x360)", "QHD (960x640)",
-                                    "HD (1280x720)", "WQHD (2560x1440)", "4K (3840x2160)"],
+            // Low (0.5M) - [Middle (1M)] - High (3M) - Super (8.3M)
+            "Display Resolution" : [ 1, ["Low", "Middle", "High", "Super"]],
+            "Game Resolution"    : [ , ["Eco mode (640x360)", "QHD (960x640)",
+                                        "HD (1280x720)", "WQHD (2560x1440)", "4K (3840x2160)"]],
             "Texture Resolution" : ["512", "1024", "2048"],
             "Frame Rate"         : ["30", "60", "90"]
         };
 
-
-
     }
 
+
+
+    
     render() {
         // どこを選択しているか把握
         let cursordiff = 0;

@@ -49,7 +49,9 @@ export default class Test1Scene extends SceneBase{
     static sceneName = "Test1";
 
     scene_initialize(){
-        const [w,h] = this.sceneMg.defaultScreenResolution;
+        this.gameResolution = this.sceneMg.config.gameResolution;
+        this.textureResolution = this.sceneMg.config.textureResolution;
+        const [w,h] = this.gameResolution;
         this.offScreen = new OffScreen(h,w,'webgl2',false,false);
         this.controller = new Controller( this.timer );
 
@@ -76,6 +78,21 @@ export default class Test1Scene extends SceneBase{
         this.gl.bindTexture(this.gl.TEXTURE_2D, texObj);
         this.gl.uniform1i(stringPtr, 0);
         this.stringRatios = stringRatios;
+    }
+
+    enter() {
+        // 解像度の設定を見て変更があればやり直し
+        if( (this.gameResolution !== this.sceneMg.config.gameResolution)
+            || (this.textureResolution !== this.sceneMg.config.textureResolution) ){
+            this.scene_initialize();
+        }
+
+        this.realScreen.setScene( this );
+        this.controller.activate();
+    }
+
+    exit() {
+        this.controller.deactivate();
     }
 
     render() {

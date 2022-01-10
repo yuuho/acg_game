@@ -52,8 +52,10 @@ export default class StartScene extends SceneBase{
     static sceneName = "START";
 
     scene_initialize() {
-        const [w,h] = this.sceneMg.defaultScreenResolution;
-        this.offScreen = new OffScreen(h,w);
+        this.gameResolution = this.sceneMg.config.gameResolution;
+        this.textureResolution = this.sceneMg.config.textureResolution;
+        const [w,h] = this.gameResolution;
+        this.offScreen = new OffScreen(h,w, 'webgl2', true,false);
         this.controller = new Controller( this.timer );
 
         this.cursor = 0;
@@ -75,13 +77,19 @@ export default class StartScene extends SceneBase{
         this.strings = this.strings.concat(this.menuList.map(x=>x.name));
         const stringPtr = this.gl.getUniformLocation(this.program, 'strings');
         let stringCvs; [stringCvs, this.texPoss, this.strDatas]
-                            = StringUtil.get_string_texture( this.strings, 2048 );
-        const texObj = GLUtil.createTexture(this.gl, stringCvs,    2048);
+            = StringUtil.get_string_texture( this.strings, this.textureResolution );
+        const texObj = GLUtil.createTexture(this.gl, stringCvs, this.textureResolution );
         this.gl.bindTexture(this.gl.TEXTURE_2D, texObj);
         this.gl.uniform1i(stringPtr, 0);
     }
 
     enter() {
+        // 解像度の設定を見て変更があればやり直し
+        if( (this.gameResolution !== this.sceneMg.config.gameResolution)
+            || (this.textureResolution !== this.sceneMg.config.textureResolution) ){
+            this.scene_initialize();
+        }
+
         this.realScreen.setScene( this );
         this.controller.activate();
     }
