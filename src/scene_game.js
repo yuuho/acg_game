@@ -1,8 +1,9 @@
+'use strict';
 
 import SceneBase from './scenebase.js';
 import GLUtil from './glutil.js';
-import {OffScreenHD} from './offscreen.js';
-import Controller from './controller.js';
+import OffScreen from './offscreen.js';
+import {Controller} from './controller.js';
 
 
 
@@ -37,13 +38,11 @@ void main() {
 
 export default class StartScene extends SceneBase{
 
+    static sceneName = 'GAME';
 
-    constructor( realScreen, timer, sceneMg ){
-        super();
-        this.realScreen = realScreen;
-        this.controller = new Controller( timer );
-        this.sceneMg = sceneMg;
-        this.offScreen = new OffScreenHD( realScreen );
+    scene_initialize(){
+        this.offScreen = new OffScreen(720,1280);
+        this.controller = new Controller( this.timer );
 
         this.cursor = 0;
         this.ctrlHist = {'ArrowUp':{}, 'ArrowDown':{}, 'Enter':{}};
@@ -58,16 +57,7 @@ export default class StartScene extends SceneBase{
         this.gl.useProgram(this.program);
     }
 
-    enter() {
-        this.realScreen.setOffScreen( this.offScreen );
-        this.controller.activate();
-    }
-
-    exit() {
-        this.controller.deactivate();
-    }
-
-    render( timer ) {
+    render() {
 
         let cursordiff = 0;
         let enter = false;
@@ -91,8 +81,8 @@ export default class StartScene extends SceneBase{
 
 
         // 描画するものを作る
-        const x = Math.sin( timer.tmpTime*0.003 );
-        const y = Math.cos( timer.tmpTime*0.003 );
+        const x = Math.sin( this.timer.tmpTime*0.003 );
+        const y = Math.cos( this.timer.tmpTime*0.003 );
         const r0=0.2, r1=0.15, r2=0.1, r3=0.14;
         const xl=-0.3, xr=0.3;
         const yt=0.2, h = 0.15, hs=0.05;
@@ -126,14 +116,11 @@ export default class StartScene extends SceneBase{
 
         // 描画処理
         this.gl.clear(this.gl.COLOR_BUFFER_BIT|this.gl.DEPTH_BUFFER_BIT);
-        //this.gl.uniform1f(this.timePtr, timer.tmpTime);
         GLUtil.sendVBO(this.gl, this.program, 'pos',  this.vbo, this.vdim /*= VBO dim*/);
         GLUtil.sendVBO(this.gl, this.program, 'coli', this.cbo, this.cdim /*= CBO dim*/);
         GLUtil.sendIBO(this.gl, this.ibo );
         this.gl.drawElements(this.gl.TRIANGLES, this.idata.length, this.gl.UNSIGNED_SHORT, 0);
         this.gl.flush();
-
-        this.realScreen.renderOffScreen();
     }
 
 }

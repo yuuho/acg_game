@@ -6,10 +6,7 @@ import StringUtil from './strutil.js';
 import OffScreen from './offscreen.js';
 import {Controller} from './controller.js';
 // 遷移先
-import GameScene from './scene_game.js';
-import Test1Scene from './scene_test1.js';
-import Test2Scene from './scene_test2.js';
-import ConfigScene from './scene_config.js';
+import StartScene from './scene_start.js';
 
 
 const vshader = `\
@@ -47,40 +44,40 @@ void main() {
 
 
 
-export default class StartScene extends SceneBase{
+export default class Test1Scene extends SceneBase{
 
-    static sceneName = "START";
+    static sceneName = "Test1";
 
-    scene_initialize() {
+    scene_initialize(){
         this.gameResolution = this.sceneMg.config.gameResolution;
         this.textureResolution = this.sceneMg.config.textureResolution;
         const [w,h] = this.gameResolution;
-        this.offScreen = new OffScreen(h,w, 'webgl2', true,false);
+        this.offScreen = new OffScreen(h,w,'webgl2',false,false);
         this.controller = new Controller( this.timer );
 
         this.cursor = 0;
         this.ctrlHist = {'ArrowUp':{}, 'ArrowDown':{}, 'Enter':{}};
 
-        this.menuList = [{'name':'GAME START',       'scene':GameScene},
-                         {'name':'CONTROLLER CHECK', 'scene':Test1Scene},
-                         {'name':'DISPLAY CHECK',    'scene':Test2Scene},
-                         {'name':'CONFIG',           'scene':ConfigScene},]
+        this.menuList = [ {'name':'back', 'scene':StartScene} ]
 
         this.gl = this.offScreen.context;
         this.program = GLUtil.createProgram(this.gl, vshader, fshader);
         this.gl.useProgram(this.program);
 
 
-        // 使用する文字列をテクスチャとして生成
+        // テクスチャ生成
         this.strings = [];
-        this.strings = this.strings.concat(['GAME TITLE']);
-        this.strings = this.strings.concat(this.menuList.map(x=>x.name));
+        this.strings = this.strings.concat(['back with enter key']);
+        for(let i=0;i<this.menuList.length;i++){
+            this.strings = this.strings.concat([this.menuList[i].name]);
+        }
         const stringPtr = this.gl.getUniformLocation(this.program, 'strings');
-        let stringCvs; [stringCvs, this.texPoss, this.strDatas]
-            = StringUtil.get_string_texture( this.strings, this.textureResolution );
-        const texObj = GLUtil.createTexture(this.gl, stringCvs, this.textureResolution );
+        const [stringCvs,stringRatios]
+                    = StringUtil.multi_string_square(this.strings, 2048, 100);
+        const texObj = GLUtil.createTexture(this.gl, stringCvs,    2048);
         this.gl.bindTexture(this.gl.TEXTURE_2D, texObj);
         this.gl.uniform1i(stringPtr, 0);
+        this.stringRatios = stringRatios;
     }
 
     enter() {
@@ -99,115 +96,120 @@ export default class StartScene extends SceneBase{
     }
 
     render() {
-        { // カーソル位置(どこを選択しているか)把握
-            let cursordiff = 0;
-            let enter = false;
-            for(let key in this.ctrlHist){ // このシーンで受け付ける種類のキーについて処理していく
-                if(this.controller.KeyBoard[key].length===0) continue; // キーが押されていないなら処理の必要なし
-                for(let i=this.controller.KeyBoard[key].length-1;i>=0;i--){ // 最新のキー入力から処理していく
-                    if(!('end' in this.controller.KeyBoard[key][i])) continue;// まだ押しっぱなしのキーなら無視
-                    const id = this.controller.KeyBoard[key][i].start+        // そのキー入力固有のIDを作成
-                                    '_'+this.controller.KeyBoard[key][i].end; //   (キー押し->離し時刻で)
-                    if(id in this.ctrlHist[key]) break; // このシーンでもう処理済みのキー入力なら無視
-                    this.ctrlHist[key][id] = 'done'; // このシーンでもう処理したキー入力として記憶
-                    if(key==='ArrowUp')         cursordiff -= 1; // ↑
-                    else if(key==='ArrowDown')  cursordiff += 1; // ↓
-                    else                        enter = true;    // Enter
-                }
-            }
-            // 現在のカーソル位置を求める
-            this.cursor = ( (this.cursor+cursordiff)%this.menuList.length
-                                +this.menuList.length)%this.menuList.length;
-            // エンターキーをが押されていたならシーン変更
-            if(enter){
-                console.log(this.menuList[this.cursor].name);
-                this.sceneMg.changeScene( this.menuList[this.cursor].scene.sceneName,
-                                        this.menuList[this.cursor].scene);
+
+        // どこを選択しているか把握
+        let cursordiff = 0;
+        let enter = false;
+        for(let key in this.ctrlHist){
+            if(this.controller.KeyBoard[key].length===0) continue;
+            for(let i=this.controller.KeyBoard[key].length-1;i>=0;i--){
+                if(!('end' in this.controller.KeyBoard[key][i])) break;
+                const id = this.controller.KeyBoard[key][i].start+
+                                '_'+this.controller.KeyBoard[key][i].end;
+                if(id in this.ctrlHist[key]) break;
+                this.ctrlHist[key][id] = 'done';
+                if(key==='ArrowUp')         cursordiff -= 1;
+                else if(key==='ArrowDown')  cursordiff += 1;
+                else                        enter = true;
             }
         }
+        this.cursor = (this.cursor+cursordiff+this.menuList.length*10)%this.menuList.length;
+        if(enter){
+            console.log(this.menuList[this.cursor].name);
+            this.sceneMg.changeScene( this.menuList[this.cursor].scene.sceneName,
+                                      this.menuList[this.cursor].scene);
+        }
 
-        // 描画するオブジェクトのデータ
+        /////////
+
         let tmpIDX = 0;
+        const array_append = (arr1,arr2)=>Array.prototype.push.apply(arr1,arr2);
+
+        // vbo, cbo, tbo, ibo
         this.vdata = []; this.vdim = 3; // 頂点座標
         this.cdata = []; this.cdim = 3; // 頂点カラー
         this.tdata = []; this.tdim = 2; // テクスチャ座標
-        this.idata = []; // インデックスバッファ idim=3
+        this.idata = [];
         // 設定
         this.depths = { 'back':0.5, 'btn':0.0, 'text':-0.5 };
 
-        { // 背景データの作成
+        (()=>{ // 背景データの作成
             const x = Math.sin( this.timer.tmpTime*0.003 );
             const y = Math.cos( this.timer.tmpTime*0.003 );
             const r0=0.2, r1=0.15, r2=0.1, r3=0.14;
-            this.vdata = this.vdata.concat(
+            array_append(this.vdata,
                 [ 1.0+r0*(x+1.0),  1.0+r0*(y+1.0), this.depths.back,
                   1.0+r1*(x+1.0), -1.0+r1*(y-1.0), this.depths.back,
                  -1.0+r2*(x-1.0), -1.0+r2*(y-1.0), this.depths.back,
                  -1.0+r3*(x-1.0),  1.0+r3*(y+1.0), this.depths.back,
                 ]);
-            this.cdata = this.cdata.concat(
-                [ 1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0, 1.0,0.0,1.0 ]);
-            this.tdata = this.tdata.concat(
+            array_append(this.cdata,
+                [ 1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0, 1.0,1.0,0.0 ]);
+            array_append(this.tdata,
                 [ -1.0,-1.0, -1.0,-1.0, -1.0,-1.0, -1.0,-1.0 ]); // none
-            this.idata = this.idata.concat(
+            array_append(this.idata,
                 [ tmpIDX+0, tmpIDX+1, tmpIDX+2,
                   tmpIDX+2, tmpIDX+3, tmpIDX+0 ]);
             tmpIDX += 4;
-        }
+        })();
 
-        { // ボタン背景の描画
+        (()=>{ // ボタン背景の描画
             const xl=-0.3, xr=0.3;
             const yt=0.2, h=0.15, hs=0.05;
-            const selectedColor    = [ 0.8,0.3,0.3, 0.8,0.3,0.3, 0.8,0.3,0.3, 0.8,0.3,0.3];
+            const selectedColor    = [ 0.3,0.3,0.8, 0.3,0.3,0.8, 0.3,0.3,0.8, 0.3,0.3,0.8];
             const notSelectedColor = [ 0.7,0.7,0.7, 0.7,0.7,0.7, 0.7,0.7,0.7, 0.7,0.7,0.7];
             for(let i=0;i<this.menuList.length;i++){
-                this.vdata = this.vdata.concat(
+                array_append(this.vdata,
                     [ xl,yt-i*(h+hs)-0,this.depths.btn, xr,yt-i*(h+hs)-0,this.depths.btn,
                       xl,yt-i*(h+hs)-h,this.depths.btn, xr,yt-i*(h+hs)-h,this.depths.btn ]);
-                this.cdata = this.cdata.concat(
+                array_append(this.cdata,
                     this.cursor===i ? selectedColor : notSelectedColor );
-                this.tdata = this.tdata.concat(
+                array_append(this.tdata,
                     [ -1.0,-1.0, -1.0,-1.0, -1.0,-1.0, -1.0,-1.0 ] ); // none
-                this.idata = this.idata.concat(
+                array_append(this.idata,
                     [ tmpIDX+0, tmpIDX+1, tmpIDX+2, tmpIDX+2, tmpIDX+3, tmpIDX+1 ]);
                 tmpIDX += 4;
             }
-        }
+        })();
 
-        { // 文字列    
-            // タイトル
+        (()=>{ // 文字列
+            ///// テクスチャ設定
+            const th = 1.0/this.strings.length;
+    
+            ///// タイトル
             const XL=-0.35, XR=0.35, YT=0.5, YB=0.3;
-            this.vdata = this.vdata.concat(
+            array_append(this.vdata,
                 [ XL,YT,this.depths.text, XR,YT,this.depths.text,
                   XL,YB,this.depths.text, XR,YB,this.depths.text ]);
-            this.cdata = this.cdata.concat(
+            array_append(this.cdata,
                 [ 1.0,1.0,1.0, 1.0,1.0,1.0, 1.0,1.0,1.0, 1.0,1.0,1.0 ] );
-            this.tdata = this.tdata.concat( this.texPoss[0] );
-            this.idata = this.idata.concat(
+            array_append(this.tdata,
+                [ 0.0,0.0, 1.0,0.0, 0.0,th, 1.0,th ] );
+            array_append(this.idata,
                 [ tmpIDX+0, tmpIDX+1, tmpIDX+2, tmpIDX+2, tmpIDX+3, tmpIDX+1 ]);
             tmpIDX += 4;
 
-            // ボタン
+            ///// ボタン
             const xL=-0.3, xR=0.3;
-            const yt=0.18, h=0.12, hs=0.08;
+            const yt=0.2, h=0.15, hs=0.05;
             const selectedColor    = [ 0.7,0.7,0.7, 0.7,0.7,0.7, 0.7,0.7,0.7, 0.7,0.7,0.7];
             const notSelectedColor = [ 0.8,0.3,0.3, 0.8,0.3,0.3, 0.8,0.3,0.3, 0.8,0.3,0.3];
             for(let i=0;i<this.menuList.length;i++){
-                const xl= xL*0.0011*this.strDatas[i+1].width;
-                const xr= xR*0.0011*this.strDatas[i+1].width;
-                this.vdata = this.vdata.concat(
+                const xl=xL*0.15*this.stringRatios[i+1];
+                const xr=xR*0.15*this.stringRatios[i+1];
+                array_append(this.vdata,
                     [ xl,yt-i*(h+hs)-0,this.depths.text, xr,yt-i*(h+hs)-0,this.depths.text,
                       xl,yt-i*(h+hs)-h,this.depths.text, xr,yt-i*(h+hs)-h,this.depths.text ]);
-                this.cdata = this.cdata.concat(
+                array_append(this.cdata,
                     this.cursor===i ? selectedColor : notSelectedColor );
-                this.tdata = this.tdata.concat( this.texPoss[i+1] );
-                this.idata = this.idata.concat(
+                array_append(this.tdata,
+                    [ 0.0,th*(i+1), 1.0,th*(i+1), 0.0,th*(i+2), 1.0,th*(i+2) ] );
+                array_append(this.idata,
                     [ tmpIDX+0, tmpIDX+1, tmpIDX+2, tmpIDX+2, tmpIDX+3, tmpIDX+1 ]);
                 tmpIDX += 4;
             }
-        }
+        })();
 
-        // buffer object にして送り込む
         this.vbo = GLUtil.createVBO(this.gl, this.vdata);
         this.cbo = GLUtil.createVBO(this.gl, this.cdata);
         this.tbo = GLUtil.createVBO(this.gl, this.tdata);
