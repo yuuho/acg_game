@@ -1,4 +1,4 @@
-var CACHE_NAME  = "acg-game-v0.0.1";
+var CACHE_NAME  = "acg-game-v0.0.2";
 var urlsToCache = [
     "index.html",
     "favicon.ico",
@@ -13,8 +13,11 @@ var urlsToCache = [
     "src/main.js",
     "src/offscreen.js",
     "src/realscreen.js",
+    "src/scene_config.js",
     "src/scene_game.js",
     "src/scene_start.js",
+    "src/scene_test1.js",
+    "src/scene_test2.js",
     "src/scenebase.js",
     "src/strutil.js",
 ];
