@@ -10,10 +10,10 @@ class StringData {
             // 呼び出し元でマージンを計算しておく必要がありつらみもある
         ctx.font = fontfunc(fontsize);
         const metrics = ctx.measureText(str);
-        const T = metrics.actualBoundingBoxAscent;
-        const B = metrics.actualBoundingBoxDescent;
-        const L = metrics.actualBoundingBoxLeft;
-        const R = metrics.actualBoundingBoxRight;
+        const T = this.ascent  = metrics.actualBoundingBoxAscent;
+        const B = this.descent = metrics.actualBoundingBoxDescent;
+        const L = this.left    = metrics.actualBoundingBoxLeft;
+        const R = this.right   = metrics.actualBoundingBoxRight;
     
         //  ,0,0
         //  +--margined-------------------------+

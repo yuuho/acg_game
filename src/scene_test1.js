@@ -82,7 +82,7 @@ export default class Test1Scene extends SceneBase{
 
     enter() {
         // 解像度の設定を見て変更があればやり直し
-        if( (this.gameResolution !== this.sceneMg.config.gameResolution)
+        if( (this.gameResolution.toString() !== this.sceneMg.config.gameResolution.toString())
             || (this.textureResolution !== this.sceneMg.config.textureResolution) ){
             this.scene_initialize();
         }

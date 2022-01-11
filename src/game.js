@@ -32,17 +32,19 @@ class GameConfig{
             "60" : 60,
             "90" : 90,
         };
-        this.set_default();
+        this.set_from_dict( this.default_setting() );
         if(config_dict!==null) this.set_from_dict(config_dict);
     }
 
-    set_default() {
-        this.displayResolution = this.displayResolutionChoices["High"];
-        this.gameResolution = this.gameResolutionChoices["FHD (1920x1080)"];
-        this.textureResolution = this.textureResolutionChoices["2048"];
-        this.frameRate = this.frameRateChoices["60"];
-        this.forceEnd = 600000;
-        this.debugBoot = false;
+    default_setting() {
+        return {
+            'displayResolution': "High",
+            'gameResolution'   : "FHD (1920x1080)",
+            'textureResolution': "2048",
+            'frameRate'        : "60",
+            'forceEnd'         : 600000,
+            'debugBoot'        : false,
+        };
     }
 
     set_from_dict(dict) {
@@ -52,6 +54,10 @@ class GameConfig{
         this.frameRate         = this.frameRateChoices[         dict["frameRate"]         ];
         this.forceEnd          = dict["forceEnd"];
         this.debugBoot         = dict["debugBoot"];
+    }
+
+    set_param(attr,choice) {
+        this[attr] = this[attr+"Choices"][choice];
     }
 }
 
