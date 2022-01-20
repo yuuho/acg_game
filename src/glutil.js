@@ -39,22 +39,85 @@ export default class GLUtil {
         return buffer_object;
     }
 
-    static sendVBO(gl, program, name, buffer_object, stride) {
+    static sendVBO(gl, program, name, buffer_object, stride, div=null) {
         const pointer = gl.getAttribLocation(program, name);
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer_object );
         gl.enableVertexAttribArray( pointer );
         gl.vertexAttribPointer( pointer, stride, gl.FLOAT, false, 0, 0);
+        if(div) gl.vertexAttribDivisor( pointer, div ); 
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
     }
 
     static sendIBO(gl, buffer_object) {
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffer_object );
     }
 
+    ///
+
+    /*
+
+    create VAO
+        create VBO_0
+        send VBO_0
+        create VBO_1
+        send VBO_1
+        ...
+        create VBO_n
+        send VBO_n
+        create IBO
+        send IBO
+
+    */
+
+    // Geometry Instancing
+    static createVAO(gl, program, vdatas, names, divs, strides, idata) {
+        console.assert((vdatas.length===names.length)
+                    && (names.length===divs.length)
+                    && (divs.length===strides.length) );
+        const vao = gl.createVertexArray();
+        gl.bindVertexArray(vao);
+        {
+            for(let i=0;i<vdatas.length;i++){
+                const vbo = GLUtil.createVBO(gl, vdatas[i]);
+                GLUtil.sendVBO(gl, program, names[i], vbo, strides[i], divs[i]);
+            }
+            const ibo = GLUtil.createIBO(gl, idata);
+            GLUtil.sendIBO(gl, ibo);
+        }
+        gl.bindVertexArray(null);
+        return vao;
+    }
+
+    static sendVAO(gl, vao) {
+        gl.bindVertexArray(vao);
+    }
+
+    static changeVAOsVariable(gl, program, vao, name, new_buffer_object, stride, div=1) {
+        gl.bindVertexArray(vao);
+        {
+            const pointer = gl.getAttribLocation(program, name);
+            gl.bindBuffer(gl.ARRAY_BUFFER, new_buffer_object );
+            gl.enableVertexAttribArray( pointer );
+            gl.vertexAttribPointer( pointer, stride, gl.FLOAT, false, 0, 0);
+            if(div) gl.vertexAttribDivisor( pointer, div ); 
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+        }
+        gl.bindVertexArray(null);
+    }
+
+
+    ///
+
     static makeStrip(vertice, names) {
         const vbo = [];
         names.forEach(name=>vbo.push(vertice[name]));
         return vbo.flat();
     }
+
+    // // 数値を増やす
+    // static shift(array, num) {
+    //     return array.map(i=>i+num);
+    // }
 
     static createTexture(gl, canvas, size=512) {
         const texObj = gl.createTexture();

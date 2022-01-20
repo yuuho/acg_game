@@ -13,6 +13,7 @@ class KyeBoard {
         this.ArrowLeft  = [];
         this.ArrowRight = [];
         this.Enter      = [];
+        this[' ']       = [];
 
         // キーが押されたときの処理
         this.keyDownHandler = (evt)=>{
