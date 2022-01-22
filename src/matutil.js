@@ -88,6 +88,26 @@ export default class MatUtil{
         return mat;
     }
 
+    static camLookAt( pos, dst, upvec) {
+        const normalize = v=>{
+            const len = Math.max(Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]),0.0000001);
+            return [ v[0]/len, v[1]/len, v[2]/len ];
+        };
+        const crossprod = (v1,v2)=>[ v1[1]*v2[2]-v1[2]*v2[1],
+                                     v1[2]*v2[0]-v1[0]*v2[2],
+                                     v1[0]*v2[1]-v1[1]*v2[0] ];
+        // 新しい座標軸が現座標系でどこを向いているか
+        const zaxis = normalize([0,1,2].map(i=>dst[i]-pos[i])); // 前向き
+        const xaxis = normalize(crossprod(upvec,zaxis)); //外積
+        const yaxis = normalize(crossprod(zaxis,xaxis)); // 外積
+        const rot = [[ xaxis[0], xaxis[1], xaxis[2], 0 ],
+                     [ yaxis[0], yaxis[1], yaxis[2], 0 ],
+                     [ zaxis[0], zaxis[1], zaxis[2], 0 ],
+                     [        0,        0,        0, 1 ],];
+        const mat = MatUtil.mm(rot, MatUtil.camMove(...pos))
+        return mat;
+    }
+
 
     static homo(mat) {
 

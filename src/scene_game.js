@@ -186,8 +186,8 @@ class Level extends Renderable {
         this.freq = 1500;   // 土管生成の周期 [ms]
         this.inf = 1000;    // 無限
         this.Zspeed = -3;   // 土管の移動速度 [m/s]
-        this.Zstart = 30;   // 土管が生成される位置
-        this.Zend = -30;    // 土管が消去される位置
+        this.Zstart = 50;   // 土管が生成される位置
+        this.Zend = -2;    // 土管が消去される位置
         this.Zinit = 10;    // ゲーム開始時に一番近い土管の位置
         this.difficulty = 2;// 通り道の最難移動幅
 
@@ -302,9 +302,7 @@ class Level extends Renderable {
             }
             this.quats  = this.quats.concat(pipe.quat);
             this.scales = this.scales.concat([1,1,1]);
-            const debug_ang = 60 /180*Math.PI; const [debug_sin,debug_cos] = [Math.cos(debug_ang), Math.sin(debug_ang)]; // debug
-            this.shifts = this.shifts.concat([ z*debug_cos, pipe.posY, z*debug_sin ]); // debug
-            // this.shifts = this.shifts.concat([ 0, pipe.posY, z ]);
+            this.shifts = this.shifts.concat([ 0, pipe.posY, z ]);
         }
         this.pipestack.splice(0,deleteCount);
     }
@@ -597,7 +595,7 @@ class RamielCharacter extends Character{
     debug_collider(gl,program, box_collider ) {
         const collideIDs = this.collision_judge( box_collider );
 
-        if(box_collider.length>2){
+        if(box_collider.length>2 || collideIDs.filter(v=>v).length>0){
             ((bc,c)=>(gl,prg,Y,IDs)=>{
                 const inf = 100;
                 let idx = 0;
@@ -605,7 +603,7 @@ class RamielCharacter extends Character{
                 let norm = [];
                 let color = [];
                 let indice = [];
-                for(let i=2;i<bc.length;i++){
+                for(let i=0;i<bc.length;i++){
                     const [x0,x1,y0,y1,z0,z1] = bc[i].map( v=>( (v<-inf)? -inf : (v>inf? inf : v) ) );
                     vpos = vpos.concat([ x0,y1,z0, x0,y1,z1, x1,y1,z1, x1,y1,z0,
                                          x0,y0,z0, x0,y0,z1, x1,y0,z1, x1,y0,z0, ]);
@@ -613,10 +611,15 @@ class RamielCharacter extends Character{
                                          1,0,0, 1,0,0, 1,0,0, 1,0,0, ]);
                     if(IDs[i]){
                         color = color.concat([ 2,0,0, 2,0,0, 2,0,0, 2,0,0,
-                                              2,0,0, 2,0,0, 2,0,0, 2,0,0, ]);
+                                               2,0,0, 2,0,0, 2,0,0, 2,0,0, ]);
                     }else{
-                        color = color.concat([ 2,2,2, 2,2,2, 2,2,2, 2,2,2,
-                                               2,2,2, 2,2,2, 2,2,2, 2,2,2, ]);
+                        if(i<2){
+                            color = color.concat([ 0,0,2, 0,0,2, 0,0,2, 0,0,2,
+                                                   0,0,2, 0,0,2, 0,0,2, 0,0,2, ]);
+                        }else{
+                            color = color.concat([ 2,2,2, 2,2,2, 2,2,2, 2,2,2,
+                                                   2,2,2, 2,2,2, 2,2,2, 2,2,2, ]);
+                        }
                     }
                     indice = indice.concat([ 0,3,1, 1,3,2, 4,7,0, 7,3,0,
                                              7,6,3, 6,2,3, 5,7,4, 5,6,7,
@@ -642,7 +645,7 @@ class RamielCharacter extends Character{
                     idx += 8;
                 }
                 const VAO = GLUtil.createVAO(gl,prg,
-                                [vpos,  color,  norm,     QU.gen([0,1,0],300), [1,1,1], [0,0,0] ],
+                                [vpos,  color,  norm,     QU.gen([0,1,0],0), [1,1,1], [0,0,0] ],
                                 ['pos', 'coli', 'normal', 'quat',    'scale', 'shift' ],
                                 [null,  null,   null,     1,         1,       1,      ],
                                 [3,     3,      3,        4,         3,       3,      ],
@@ -792,14 +795,23 @@ export default class GameScene extends SceneBase{
 
         // カメラ位置と画角を設定
         {
-            const camPos = [0,2,-10];
-            const vMat = MU.mm( MU.camLookUpL(-10), MU.camMove(...camPos) );
-            const pMat = MU.proj( 30, 1, 1, 1000);
+            //const camPos = [0,2,-10];
+            ///const camPos = [0,2,-10];
+            const rad = ((this.timer.tmpTime*0.05)/360%1)*(2*Math.PI);
+            const camPos = [3*Math.cos(rad),3*Math.sin(rad),-10];
+            
+            const vMat = MU.camLookAt(camPos,[0,0,0],[0,1,0]);
+            
+            //console.log( MU.print(vMat) );
+            //console.log( MU.print(MU.camLookAt(camPos, [0,0,0], [0,1,0]) ) );
+
             const camPosPtr = this.gl.getUniformLocation(this.program, 'camPos');
             const vMatPtr = this.gl.getUniformLocation(this.program, 'vMat');
-            const pMatPtr = this.gl.getUniformLocation(this.program, 'pMat');
             this.gl.uniform3fv(camPosPtr, camPos);
             this.gl.uniformMatrix4fv(vMatPtr,  true /*=transpose*/, new Float32Array( vMat.flat() ));
+            
+            const pMat = MU.proj( 30, 1, 1, 1000);
+            const pMatPtr = this.gl.getUniformLocation(this.program, 'pMat');
             this.gl.uniformMatrix4fv(pMatPtr,  true /*=transpose*/, new Float32Array( pMat.flat() ));
         }
 
@@ -845,6 +857,10 @@ export default class GameScene extends SceneBase{
         this.debugNS.world1 = this.world.createVAOs( this.debugNS.gl1, this.debugNS.program1);
         this.debugNS.level1 = this.level.createVAOs( this.debugNS.gl1, this.debugNS.program1);
         this.debugNS.chara1 = this.character.createVAOs( this.debugNS.gl1, this.debugNS.program1);
+
+        this.debugNS.world2 = this.world.createVAOs( this.debugNS.gl2, this.debugNS.program2);
+        this.debugNS.level2 = this.level.createVAOs( this.debugNS.gl2, this.debugNS.program2);
+        this.debugNS.chara2 = this.character.createVAOs( this.debugNS.gl2, this.debugNS.program2);
     }
     // デバッグ画面の消去
     close_debugger() {
@@ -867,7 +883,6 @@ export default class GameScene extends SceneBase{
         // 処理
 
         {
-            
             { // 描画範囲の座標限界を設定
                 [this.Xlim,this.Ylim,this.sXlim,this.sYlim] = this.offScreen.getXYlims();
                 const [u,v] = [this.offScreen.canvas.width, this.offScreen.canvas.height];
@@ -881,10 +896,10 @@ export default class GameScene extends SceneBase{
                 gl1.uniform2fv(sXYlimPtr, [this.sXlim,this.sYlim]);
             }
 
-            // カメラ位置と画角を設定
-            {
-                const camPos = [0,2,-10];
-                const vMat = MU.mm( MU.camLookUpL(-10), MU.camMove(...camPos) );
+            { // カメラ位置と画角を設定
+                const camPos = [7,2,-15];
+                const vMat = MU.camLookAt(camPos,[0,0,0],[0,1,0]);
+
                 const pMat = MU.proj( 30, 1, 1, 1000);
                 const camPosPtr = gl1.getUniformLocation(prg1, 'camPos');
                 const vMatPtr = gl1.getUniformLocation(prg1, 'vMat');
@@ -904,9 +919,74 @@ export default class GameScene extends SceneBase{
             this.level.render(gl1, prg1, this.debugNS.level1);
             // デバッグ
             this.character.debug_collider(gl1, prg1, this.level.collider);
+
+            {
+                const inf=100; const quat = QU.gen([1,0,0],0);
+                GLUtil.sendVBO(gl1,prg1, 'pos'   , GLUtil.createVBO(gl1,[inf,0,0, -inf,0,0, 0,inf,0, 0,-inf,0, 0,0,inf, 0,0,-inf]), 3);
+                GLUtil.sendVBO(gl1,prg1, 'coli'  , GLUtil.createVBO(gl1,[inf,0,0,  inf,0,0, 0,inf,0, 0, inf,0, 0,0,inf, 0,0, inf]), 3);
+                GLUtil.sendVBO(gl1,prg1, 'normal', GLUtil.createVBO(gl1,[0,0,0, 0,0,0,  0,0,0, 0,0,0,  0,0,0, 0,0,0]             ), 3);
+                GLUtil.sendVBO(gl1,prg1, 'quat'  , GLUtil.createVBO(gl1,[...quat, ...quat, ...quat, ...quat, ...quat, ...quat]   ), 4);
+                GLUtil.sendVBO(gl1,prg1, 'scale' , GLUtil.createVBO(gl1,[1,1,1, 1,1,1,  1,1,1, 1,1,1,  1,1,1, 1,1,1]             ), 3);
+                GLUtil.sendVBO(gl1,prg1, 'shift' , GLUtil.createVBO(gl1,[0,0,0, 0,0,0,  0,0,0, 0,0,0,  0,0,0, 0,0,0]             ), 3);
+                GLUtil.sendIBO(gl1,                GLUtil.createIBO(gl1,[0,1, 2,3, 4,5]                                          )   );
+                gl1.drawElements(gl1.LINES, 6, gl1.UNSIGNED_SHORT, 0);
+            }
+
             // 画面を更新
             gl1.flush();
+        }
 
+        {
+            { // 描画範囲の座標限界を設定
+                [this.Xlim,this.Ylim,this.sXlim,this.sYlim] = this.offScreen.getXYlims();
+                const [u,v] = [this.offScreen.canvas.width, this.offScreen.canvas.height];
+                const resPtr = gl2.getUniformLocation(prg2, 'resolution');
+                gl2.uniform2fv(resPtr, [u,v]);
+                const XYlimPtr = gl2.getUniformLocation(prg2, 'XYlim');
+                gl2.uniform2fv(XYlimPtr, [this.Xlim,this.Ylim]);
+                const XYlim2Ptr = gl2.getUniformLocation(prg2, 'XYlim2');
+                gl2.uniform2fv(XYlim2Ptr, [this.Xlim,this.Ylim]);
+                const sXYlimPtr = gl2.getUniformLocation(prg2, 'sXYlim');
+                gl2.uniform2fv(sXYlimPtr, [this.sXlim,this.sYlim]);
+            }
+
+            { // カメラ位置と画角を設定
+                const camPos = [-7,2,-15];
+                const vMat = MU.camLookAt(camPos,[0,0,0],[0,1,0]);
+
+                const pMat = MU.proj( 30, 1, 1, 1000);
+                const camPosPtr = gl2.getUniformLocation(prg2, 'camPos');
+                const vMatPtr = gl2.getUniformLocation(prg2, 'vMat');
+                const pMatPtr = gl2.getUniformLocation(prg2, 'pMat');
+                gl2.uniform3fv(camPosPtr, camPos);
+                gl2.uniformMatrix4fv(vMatPtr,  true /*=transpose*/, new Float32Array( vMat.flat() ));
+                gl2.uniformMatrix4fv(pMatPtr,  true /*=transpose*/, new Float32Array( pMat.flat() ));
+            }
+
+            // 画面を初期化
+            gl2.clear(gl2.COLOR_BUFFER_BIT|gl2.DEPTH_BUFFER_BIT);
+            // 背景の描画
+            this.world.render(gl2, prg2, this.debugNS.world2);
+            // キャラクターの描画
+            this.character.render(gl2, prg2, this.debugNS.chara2);
+            // ステージの描画
+            this.level.render(gl2, prg2, this.debugNS.level2);
+            // デバッグ
+            this.character.debug_collider(gl2, prg2, this.level.collider);
+
+            {
+                const inf=100; const quat = QU.gen([1,0,0],0);
+                GLUtil.sendVBO(gl2,prg2, 'pos'   , GLUtil.createVBO(gl2,[inf,0,0, -inf,0,0, 0,inf,0, 0,-inf,0, 0,0,inf, 0,0,-inf]), 3);
+                GLUtil.sendVBO(gl2,prg2, 'coli'  , GLUtil.createVBO(gl2,[inf,0,0,  inf,0,0, 0,inf,0, 0, inf,0, 0,0,inf, 0,0, inf]), 3);
+                GLUtil.sendVBO(gl2,prg2, 'normal', GLUtil.createVBO(gl2,[0,0,0, 0,0,0,  0,0,0, 0,0,0,  0,0,0, 0,0,0]             ), 3);
+                GLUtil.sendVBO(gl2,prg2, 'quat'  , GLUtil.createVBO(gl2,[...quat, ...quat, ...quat, ...quat, ...quat, ...quat]   ), 4);
+                GLUtil.sendVBO(gl2,prg2, 'scale' , GLUtil.createVBO(gl2,[1,1,1, 1,1,1,  1,1,1, 1,1,1,  1,1,1, 1,1,1]             ), 3);
+                GLUtil.sendVBO(gl2,prg2, 'shift' , GLUtil.createVBO(gl2,[0,0,0, 0,0,0,  0,0,0, 0,0,0,  0,0,0, 0,0,0]             ), 3);
+                GLUtil.sendIBO(gl2,                GLUtil.createIBO(gl2,[0,1, 2,3, 4,5]                                          )   );
+                gl2.drawElements(gl2.LINES, 6, gl2.UNSIGNED_SHORT, 0);
+            }
+            // 画面を更新
+            gl2.flush();
         }
 
 

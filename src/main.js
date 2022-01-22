@@ -16,30 +16,3 @@ const main = ()=>{
 
 // ページが読み込まれたら開始
 window.addEventListener('load',main,false);
-
-
-window.addEventListener('load',()=>{
-    console.log(7 in [1,7,3].values());
-},false);
-
-// window.addEventListener('load',()=>{
-// 
-//     const N = 999999;
-//     let start = 0;
-// 
-//     const jsarr = [...Array(N)].map((_,i)=>i);
-//     const f32arr = new Float32Array( [...Array(N)].map((_,i)=>i) );
-//     console.log(f32arr);
-// 
-//     start = (new Date()).getTime();
-//     const f32arr2 = new Float32Array( f32arr );
-//     console.log((new Date()).getTime()-start, f32arr2);
-// 
-//     start = (new Date()).getTime();
-//     const f32arr3 = new Float32Array( jsarr );
-//     console.log((new Date()).getTime()-start, f32arr3);
-// 
-//     console.log(f32arr instanceof Float32Array);
-//     console.log(f32arr instanceof Float64Array);
-// 
-// },false);
