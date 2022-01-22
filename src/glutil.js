@@ -25,8 +25,9 @@ export default class GLUtil {
 
     static createVBO(gl, data) {
         const buffer_object = gl.createBuffer();
+        const f32arr = (data instanceof Float32Array) ? data : new Float32Array(data);
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer_object);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, f32arr, gl.STATIC_DRAW);
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
         return buffer_object;
     }

@@ -137,31 +137,61 @@ void main() {
 `.replace('IMPORT_GLSLSNIPPET', SU.shader);
 
 
-// 土管
-class PipeObj {
-    constructor(gentime, direction, posY) {
-        this.gentime = gentime; // ms
-        this.direction = direction; // +1 or -1
-        this.quat = QU.gen( [1,0,0], direction>0 ? 0 : 180 );
-        this.posY = posY;
+// 3Dオブジェクト
+class Renderable{
+
+    constructor( timer ) {
+        this.timer = timer;
+        this.model_initialize();
+    }
+
+    // モデルなどの初期化
+    model_initialize() {
+        throw Error('Not Implemented Error.');
+    }
+
+    // レンダリングの呼び出し
+    render(gl, program, VAOs) {
+        throw Error('Not Implemented Error');
+    }
+    createVAOs(gl, program) {
+        throw Error('Not Implemented Error');
     }
 }
 
+
 // ステージ
-class Level {
-    constructor(timer,radius) {
+class Level extends Renderable {
+
+    constructor(timer, radius, character_size) {
+        super(timer);
+
+        // 土管クラス
+        this.PipeObjClass = class {
+            constructor(gentime, direction, posY) {
+                this.gentime = gentime; // ms
+                this.direction = direction; // +1 or -1
+                this.quat = QU.gen( [1,0,0], direction>0 ? 0 : 180 );
+                this.posY = posY;
+            }
+        };
+
+        this.characterZmax =  character_size; // とりあえず。キャラクターがいそうな領域の z最大値
+        this.characterZmin = -character_size; // とりあえず。キャラクターがいそうな領域の z最小値
+
         this.timer = timer;
         this.stat_time = this.timer.tmpTime;
         this.radius = radius;
 
-        this.freq = 1500;
-        this.inf = 1000;
-        this.Zspeed = -3; // m/s
-        this.Zstart = 30;
-        this.Zend = -30;
-        this.Zinit = 10; // ゲーム開始時に一番近い土管
-        this.difficulty = 2; // 通り道の最難移動幅
+        this.freq = 1500;   // 土管生成の周期 [ms]
+        this.inf = 1000;    // 無限
+        this.Zspeed = -3;   // 土管の移動速度 [m/s]
+        this.Zstart = 30;   // 土管が生成される位置
+        this.Zend = -30;    // 土管が消去される位置
+        this.Zinit = 10;    // ゲーム開始時に一番近い土管の位置
+        this.difficulty = 2;// 通り道の最難移動幅
 
+        // 初期化
         this.last_time = null;// 最後に生成チェックをした時刻
         this.steps_from_lastgen = this.inf; // 最後に土管が生成されたのが何ステップ前か
         this.prev_upper_limit = this.inf;   // 最後に作った通り道の上限
@@ -177,15 +207,55 @@ class Level {
         this.dead_upper_limit = path_height*2;
         this.dead_lower_limit = -path_height*2;
 
+        // 存在する土管のリスト
         this.pipestack = [];
-
+        // ゲーム開始時に存在しているべき土管の生成
         this.pre_generate();
     }
 
+    /// Renderable methods
+    model_initialize() {
+        this.model = new Pipe();
+        this.vaoTemplate = [
+            [this.model.vertices, this.model.colors, this.model.normals, [],     [],      []      ],
+            ['pos',               'coli',            'normal',           'quat', 'scale', 'shift' ],
+            [null,                null,              null,               1,      1,       1,      ],
+            [this.model.vdim,     this.model.cdim,   this.model.ndim,    4,      3,       3,      ],
+            this.model.indices
+        ];
+    }
+    createVAOs(gl,program) {
+        return GLUtil.createVAO(gl, program, ...this.vaoTemplate);
+    }
+    render(gl, program, VAO) {
+        // 場所と姿勢のパラメータのみ書き換える
+        /// const quat0 = QU.gen( [0,1,0], this.timer.tmpTime*0.2 );
+        /// const quat1 = QU.gen( [1,0,0], this.timer.tmpTime*0.1 );
+        /// const quat = QU.mul( quat0, quat1  );
+        /// //const quat = QU.gen( [1,0,0], 80 );
+        /// const scale = [ 1,1,1 ];
+        /// const shift = [ 0,0,0 ];
+        /// const numObj = 1;
+
+        const [quat,scale,shift,numObj] = this.data;
+
+        GLUtil.changeVAOsVariable( gl, program, VAO, 'quat',  GLUtil.createVBO(gl, quat ), /*stride*/ 4);
+        GLUtil.changeVAOsVariable( gl, program, VAO, 'scale', GLUtil.createVBO(gl, scale), /*stride*/ 3);
+        GLUtil.changeVAOsVariable( gl, program, VAO, 'shift', GLUtil.createVBO(gl, shift), /*stride*/ 3);
+    
+        GLUtil.sendVAO(gl, VAO);
+        gl.uniform1i( gl.getUniformLocation(program, 'isBackground'), 0); // とりあえず
+        gl.drawElementsInstanced(gl.TRIANGLES, this.model.length, gl.UNSIGNED_SHORT, /*start*/0, /*#-obj*/ numObj);
+    }
+
+    /// level methods
+
+    // ゲーム開始からの時刻
     now_ms() {
         return this.timer.tmpTime-this.stat_time;
     }
 
+    // (毎フレーム実行)
     update() {
         // 生成タイミングが来ているか確認
         const now_ms = this.now_ms()
@@ -200,18 +270,20 @@ class Level {
             this.generate( this.prev_upper_limit+this.difficulty*this.steps_from_lastgen,
                            this.prev_lower_limit-this.difficulty*this.steps_from_lastgen, timing_ms);
         }
-
-        // TODO ここで先にデータを計算しておく
+        // 土管のパラメータをリストアップ、範囲外に出た土管を消す
         this.calc_and_delete();
     }
 
+    // 土管のパラメータをリストアップ、範囲外に出た土管をけす
     calc_and_delete() {
         const time_ms = this.now_ms();
         this.quats  = [];
         this.scales = [];
         this.shifts = [];
         let deleteCount = 0;
-        this.collider = [];
+        this.collider = [[-this.inf, this.inf, -this.inf, this.dead_lower_limit, -this.inf, this.inf ],  // floor
+                         [-this.inf, this.inf,  this.dead_upper_limit, this.inf, -this.inf, this.inf ]]; // ceil
+
         for(let i=0;i<this.pipestack.length;i++){
             const pipe = this.pipestack[i];
             const t = (time_ms-pipe.gentime)/1000;
@@ -221,14 +293,18 @@ class Level {
                 continue;
             }
             // 衝突判定しなければいけないもの
-            if(z-this.pipe_radius<this.pipe_radius && z+this.pipe_radius>-this.pipe_radius){
-                this.collider.push([ pipe.direction, pipe.posY, z-this.pipe_radius, z+this.pipe_radius ]);
+            if( ( z<(this.characterZmax+this.radius) ) && ( z>(this.characterZmin-this.radius) ) ){
+                if(pipe.direction>0){
+                    this.collider.push([ -this.radius, this.radius, -this.inf, pipe.posY, z-this.radius, z+this.radius ]);
+                }else{
+                    this.collider.push([ -this.radius, this.radius, pipe.posY, this.inf, z-this.radius, z+this.radius ]);
+                }
             }
             this.quats  = this.quats.concat(pipe.quat);
             this.scales = this.scales.concat([1,1,1]);
-            const debug_ang = 60 /180*Math.PI;
-            const [debug_sin,debug_cos] = [Math.cos(debug_ang), Math.sin(debug_ang)];
-            this.shifts = this.shifts.concat([ z*debug_cos, pipe.posY, z*debug_sin ]);
+            const debug_ang = 60 /180*Math.PI; const [debug_sin,debug_cos] = [Math.cos(debug_ang), Math.sin(debug_ang)]; // debug
+            this.shifts = this.shifts.concat([ z*debug_cos, pipe.posY, z*debug_sin ]); // debug
+            // this.shifts = this.shifts.concat([ 0, pipe.posY, z ]);
         }
         this.pipestack.splice(0,deleteCount);
     }
@@ -243,8 +319,10 @@ class Level {
                            this.prev_lower_limit-this.difficulty*this.steps_from_lastgen, timing_ms);
         }
         this.last_time = 0;
+        this.collider = [];
     }
 
+    // 確率的土管生成
     generate( upper_limit, lower_limit, timing_ms ) {
         const ratios = [/*none*/  4, /*top*/ 1, /*bottom*/ 1,/*both*/ 2]; // 各状態の比率
         const total = ratios.reduce((s,e)=>s+e,0); // 比率の合計値
@@ -277,20 +355,20 @@ class Level {
                 this.prev_upper_limit = topY;
                 this.prev_lower_limit = lower_limit;
                 this.steps_from_lastgen = 0;
-                this.pipestack.push( new PipeObj( timing_ms, -1, topY    ) );
+                this.pipestack.push( new this.PipeObjClass( timing_ms, -1, topY    ) );
                 break;
             case 2: // 下にだけ土管生成
                 this.prev_upper_limit = upper_limit;
                 this.prev_lower_limit = bottomY;
                 this.steps_from_lastgen = 0;
-                this.pipestack.push( new PipeObj( timing_ms,  1, bottomY ) );
+                this.pipestack.push( new this.PipeObjClass( timing_ms,  1, bottomY ) );
                 break;
             case 3: // 上下に土管生成
                 this.prev_upper_limit = topY;
                 this.prev_lower_limit = bottomY;
                 this.steps_from_lastgen = 0;
-                this.pipestack.push( new PipeObj( timing_ms, -1, topY    ) );
-                this.pipestack.push( new PipeObj( timing_ms,  1, bottomY ) );
+                this.pipestack.push( new this.PipeObjClass( timing_ms, -1, topY    ) );
+                this.pipestack.push( new this.PipeObjClass( timing_ms,  1, bottomY ) );
                 break;
             default:
                 console.log('error generate status');
@@ -299,38 +377,303 @@ class Level {
 
     // 土管の位置確認、生存制御
     get data() {
-        ///// const time_ms = this.now_ms();
-        ///// let quats  = [];
-        ///// let scales = [];
-        ///// let shifts = [];
-        ///// let deleteCount = 0;
-        ///// let collider = [];
-        ///// for(let i=0;i<this.pipestack.length;i++){
-        /////     const pipe = this.pipestack[i];
-        /////     const t = (time_ms-pipe.gentime)/1000;
-        /////     const z = this.Zstart + this.Zspeed*t;
-        /////     if(z<this.Zend){
-        /////         deleteCount++;
-        /////         continue;
-        /////     }
-        /////     // 衝突判定しなければいけないもの
-        /////     if(z-this.pipe_radius<this.pipe_radius && z+this.pipe_radius>-this.pipe_radius){
-        /////         collider.push([ pipe.direction, pipe.posY, z-this.pipe_radius, z+this.pipe_radius ]);
-        /////     }
-        /////     quats  = quats.concat(pipe.quat);
-        /////     scales = scales.concat([1,1,1]);
-        /////     const debug_ang = 60 /180*Math.PI;
-        /////     const [debug_sin,debug_cos] = [Math.cos(debug_ang), Math.sin(debug_ang)];
-        /////     shifts = shifts.concat([ z*debug_cos, pipe.posY, z*debug_sin ]);
-        ///// }
-        ///// this.pipestack.splice(0,deleteCount);
-        ///// return [ quats, scales, shifts, this.pipestack.length, collider ];
-        return [ this.quats, this.scales, this.shifts,
-                    this.pipestack.length, this.collider ];
+        return [ this.quats, this.scales, this.shifts, this.pipestack.length ];
     }
 }
 
 
+// 背景
+class Background extends Renderable{
+    model_initialize() {
+        // モデル
+        this.model = new Universe();
+        this.vaoTemplate = [
+            [this.model.vertices, this.model.colors, this.model.normals, [],     [],      []      ],
+            ['pos',               'coli',            'normal',           'quat', 'scale', 'shift' ],
+            [null,                null,              null,               1,      1,       1,      ],
+            [this.model.vdim,     this.model.cdim,   this.model.ndim,    4,      3,       3,      ],
+            this.model.indices
+        ];
+    }
+    createVAOs(gl,program) {
+        return GLUtil.createVAO( gl, program, ...this.vaoTemplate );
+    }
+    render(gl,program,VAOs) {
+        const quat = QU.gen( [0,1,0], 0 );
+        const scale = [ 1,1,1 ];
+        const shift = [ 0,0,0 ];
+    
+        GLUtil.changeVAOsVariable(gl, program, VAOs, 'quat',  GLUtil.createVBO(gl, quat ), /*stride*/ 4);
+        GLUtil.changeVAOsVariable(gl, program, VAOs, 'scale', GLUtil.createVBO(gl, scale), /*stride*/ 3);
+        GLUtil.changeVAOsVariable(gl, program, VAOs, 'shift', GLUtil.createVBO(gl, shift), /*stride*/ 3);
+
+        GLUtil.sendVAO(gl, VAOs );
+        gl.uniform1i( gl.getUniformLocation(program, 'isBackground'), 1); // とりあえず
+        gl.drawElementsInstanced(gl.TRIANGLES, this.model.length, gl.UNSIGNED_SHORT, /*start*/0, /*#-obj*/ 1);
+    }
+}
+
+
+// 操作可能キャラクター
+class Character extends Renderable{
+    constructor( timer, character_size ) {
+        super( timer );
+        this.character_size = character_size;
+        this.character_initialize();
+    }
+
+    // キャラクターのジャンプなどのパラメータを設定
+    character_initialize() {
+    }
+
+    // ジャンプキー入力
+    jump( ups ) {
+    }
+
+    // 衝突判定
+    collision_judge( collider ) {
+        return false;
+    }
+
+    // ストックが減る
+    decrement_stocks(num) {
+    }
+
+    get position() {
+        return [0,0,0];
+    }
+
+    // 死んでいるかどうか確認
+    get isDead() {
+        return false;
+    }
+}
+
+
+// ラミエル
+class RamielCharacter extends Character{
+    /// Renderable methods
+
+    // モデル初期化
+    model_initialize() {
+        // モデル
+        const colors = [...Array(8)].map(()=>[0,0.8,1.0]);
+        // const colors = [[1,0,0],[0,1,0],[0,0,1],[0,1,1],[1,0,1],[1,1,0],[0,0,0],[0.7,0.7,0.7]]; // debug
+        this.model = new Ramiel( colors );
+        this.vaoTemplate = [
+            [this.model.vertices, this.model.colors, this.model.normals, [],     [],      []      ],
+            ['pos',               'coli',            'normal',           'quat', 'scale', 'shift' ],
+            [null,                null,              null,               1,      1,       1,      ],
+            [this.model.vdim,     this.model.cdim,   this.model.ndim,    4,      3,       3,      ],
+            this.model.indices
+        ];
+    }
+    createVAOs(gl,program) {
+        return GLUtil.createVAO( gl, program, ...this.vaoTemplate );
+    }
+    // モデルレンダリング
+    render(gl,program,VAOs) {
+        const ang_rad = ((this.timer.tmpTime*0.2)/360%1)*(2*Math.PI);
+        const pos_rad = ((this.timer.tmpTime*0.1)/360%1)*(2*Math.PI);
+    
+        const rotV = [0,1,0];
+        const [ang0,ang1] = [ ang_rad, ang_rad+0.5*Math.PI ];
+        const [posX, posY, posZ] = this.position;
+    
+        const quat  = [ rotV[0]*Math.sin(ang0/2.0), rotV[1]*Math.sin(ang0/2.0), rotV[2]*Math.sin(ang0/2.0), Math.cos(ang0/2.0),
+                        rotV[0]*Math.sin(ang1/2.0), rotV[1]*Math.sin(ang1/2.0), rotV[2]*Math.sin(ang1/2.0), Math.cos(ang1/2.0),
+                        rotV[0]*Math.sin(ang1/2.0), rotV[1]*Math.sin(ang1/2.0), rotV[2]*Math.sin(ang1/2.0), Math.cos(ang1/2.0)];
+        const scale = [ 0.2,0.2,0.2,  0.2,0.2,0.2,  this.character_size,this.character_size,this.character_size ];
+        const shift = [ 2*Math.cos(pos_rad),             0, 2*Math.sin(pos_rad),
+                        3*Math.cos(pos_rad+0.5*Math.PI), 0, 3*Math.sin(pos_rad+0.5*Math.PI),
+                        posX, posY, posZ ];
+
+        // 場所と姿勢のパラメータのみ書き換える
+        GLUtil.changeVAOsVariable(gl, program, VAOs, 'quat',  GLUtil.createVBO(gl, quat ), /*stride*/ 4);
+        GLUtil.changeVAOsVariable(gl, program, VAOs, 'scale', GLUtil.createVBO(gl, scale), /*stride*/ 3);
+        GLUtil.changeVAOsVariable(gl, program, VAOs, 'shift', GLUtil.createVBO(gl, shift), /*stride*/ 3);
+        
+        // 描画
+        GLUtil.sendVAO(gl, VAOs);
+        gl.uniform1i( gl.getUniformLocation( program, 'isBackground'), 0); // とりあえず
+        gl.drawElementsInstanced( gl.TRIANGLES, this.model.length, gl.UNSIGNED_SHORT, /*start*/0, /*#-obj*/ 3);
+    }
+
+    /// Character methods
+
+    character_initialize() {
+        this.gravity    = -6;
+        // this.jumpAY     = 500; // m/s/s
+        // this.jumpAT     = 10;  // ms
+        this.jumpAY     = 1000; // m/s/s
+        this.jumpAT     = 5;  // ms
+
+        this.num_stock  = 3;
+        this.collider_size = this.character_size*0.7;
+
+        // spawn time initialization
+        this.jump_stack = [];
+        this.prev_time  = null;
+        this.started    = false;
+        this.speedY     = 0;
+        this.posY       = 0;
+
+        this.hoge = this.timer.tmpTime;
+    }
+
+    // ジャンプなど
+    jump( ups ){
+        // ジャンプ操作集計
+        if(ups.length!==0){
+            if(!this.started){ // キャラクター操作が開始されていなかったら
+                this.started = true; // キャラクター操作を開始
+                this.prev_time = ups[0].start; // 最後に計算した時刻を
+                ups = [];// 一番最初はジャンプしない
+            }
+            this.jump_stack = this.jump_stack.concat(ups);
+        }
+
+        // キャラクター位置の計算
+        if(this.started){
+            const now_ms = this.timer.tmpTime;
+            const msec = now_ms-this.prev_time;
+            // 加速度をリストアップ
+            const accel = new Float64Array( msec );
+            for(let i=0,j=this.prev_time;i<msec;i++,j++){
+                accel[i] = this.gravity;
+                for(let k=0;k<this.jump_stack.length;k++){
+                    const jump = this.jump_stack[k].start;
+                    if( jump<=j && j<jump+this.jumpAT ){
+                        accel[i] += this.jumpAY;
+                    }
+                }
+            }
+
+            // いらなくなったジャンプを消す
+            let delcount = 0;
+            for(let k=0;k<this.jump_stack.length;k++){
+                if(this.jump_stack[k].start+this.jumpAT<=now_ms) delcount++;
+            }
+            this.jump_stack.splice(0,delcount);
+
+            // 速度、位置の計算
+            const speed = new Float64Array( msec );
+            speed[0] = this.speedY + accel[0]*0.001;
+            const posiY = new Float64Array( msec );
+            posiY[0] = this.posY + speed[0]*0.001;
+            for(let i=1;i<msec;i++){
+                speed[i] = speed[i-1]+accel[i]*0.001;
+                posiY[i] = posiY[i-1]+speed[i]*0.001;
+            }
+
+            this.posY   = posiY[msec-1];
+            this.speedY = speed[msec-1];
+            this.prev_time = now_ms;
+        }
+    }
+
+    // 衝突判定
+    collision_judge( box_collider ) {
+        const collideIDs = [...Array(box_collider.length)].map(()=>false);
+        const [x,y,z] = this.position;
+        const c = this.collider_size;
+        const [Xmin,Xmax,Ymin,Ymax,Zmin,Zmax] = [x-c,x+c,y-c,y+c,z-c,z+c];
+        for(let i=0;i<box_collider.length;i++){
+            const [xmin,xmax,ymin,ymax,zmin,zmax] = box_collider[i];
+            if(    ( (!(Xmax<xmin)) && (!(xmax<Xmin)) )
+                && ( (!(Ymax<ymin)) && (!(ymax<Ymin)) )
+                && ( (!(Zmax<zmin)) && (!(zmax<Zmin)) ) ){
+                collideIDs[i] = true;
+            }
+        }
+        return collideIDs;
+    }
+
+    is_colliding( box_collider ) {
+        const collision_judges = this.collision_judge(box_collider);
+        return collision_judges.filter(v=>v).length>0;
+    }
+
+    debug_collider(gl,program, box_collider ) {
+        const collideIDs = this.collision_judge( box_collider );
+
+        if(box_collider.length>2){
+            ((bc,c)=>(gl,prg,Y,IDs)=>{
+                const inf = 100;
+                let idx = 0;
+                let vpos = [];
+                let norm = [];
+                let color = [];
+                let indice = [];
+                for(let i=2;i<bc.length;i++){
+                    const [x0,x1,y0,y1,z0,z1] = bc[i].map( v=>( (v<-inf)? -inf : (v>inf? inf : v) ) );
+                    vpos = vpos.concat([ x0,y1,z0, x0,y1,z1, x1,y1,z1, x1,y1,z0,
+                                         x0,y0,z0, x0,y0,z1, x1,y0,z1, x1,y0,z0, ]);
+                    norm = norm.concat([ 1,0,0, 1,0,0, 1,0,0, 1,0,0,
+                                         1,0,0, 1,0,0, 1,0,0, 1,0,0, ]);
+                    if(IDs[i]){
+                        color = color.concat([ 2,0,0, 2,0,0, 2,0,0, 2,0,0,
+                                              2,0,0, 2,0,0, 2,0,0, 2,0,0, ]);
+                    }else{
+                        color = color.concat([ 2,2,2, 2,2,2, 2,2,2, 2,2,2,
+                                               2,2,2, 2,2,2, 2,2,2, 2,2,2, ]);
+                    }
+                    indice = indice.concat([ 0,3,1, 1,3,2, 4,7,0, 7,3,0,
+                                             7,6,3, 6,2,3, 5,7,4, 5,6,7,
+                                             1,2,5, 2,6,5, 0,1,5, 0,5,4 ].map(v=>v+idx) );
+                    idx += 8;
+                }
+                {
+                    const [x0,x1,y0,y1,z0,z1] = [-c,c,Y-c,Y+c,-c,c];
+                    vpos = vpos.concat([ x0,y1,z0, x0,y1,z1, x1,y1,z1, x1,y1,z0,
+                                         x0,y0,z0, x0,y0,z1, x1,y0,z1, x1,y0,z0, ]);
+                    norm = norm.concat([ 1,0,0, 1,0,0, 1,0,0, 1,0,0,
+                                         1,0,0, 1,0,0, 1,0,0, 1,0,0, ]);
+                    if(IDs.filter(v=>v).length>0){
+                        color = color.concat([ 2,0,0, 2,0,0, 2,0,0, 2,0,0,
+                                               2,0,0, 2,0,0, 2,0,0, 2,0,0, ]);
+                    }else{
+                        color = color.concat([ 2,2,2, 2,2,2, 2,2,2, 2,2,2,
+                                               2,2,2, 2,2,2, 2,2,2, 2,2,2, ]);
+                    }
+                    indice = indice.concat([ 0,3,1, 1,3,2, 4,7,0, 7,3,0,
+                                            7,6,3, 6,2,3, 5,7,4, 5,6,7,
+                                            1,2,5, 2,6,5, 0,1,5, 0,5,4 ].map(v=>v+idx) );
+                    idx += 8;
+                }
+                const VAO = GLUtil.createVAO(gl,prg,
+                                [vpos,  color,  norm,     QU.gen([0,1,0],300), [1,1,1], [0,0,0] ],
+                                ['pos', 'coli', 'normal', 'quat',    'scale', 'shift' ],
+                                [null,  null,   null,     1,         1,       1,      ],
+                                [3,     3,      3,        4,         3,       3,      ],
+                                indice );
+                GLUtil.sendVAO(gl,VAO);
+                gl.drawElementsInstanced( gl.TRIANGLES, indice.length, gl.UNSIGNED_SHORT, /*start*/0, /*#-obj*/ 1);
+            })(box_collider,this.collider_size)(gl,program,this.position[1],collideIDs);
+        }
+    }
+
+    decrement_stocks(num) {
+        this.num_stock -= num;
+        // TODO : respawn
+        this.jump_stack = [];
+        this.prev_time  = null;
+        this.started    = false;
+        this.speedY     = 0;
+        this.posY       = 0;
+    }
+
+    get position() {
+        return [0, this.posY, 0];
+    }
+
+    get isDead() {
+        return this.num_stock<=0;
+    }
+}
+
+
+// シーン
 export default class GameScene extends SceneBase{
 
     static sceneName = 'GAME';
@@ -353,10 +696,6 @@ export default class GameScene extends SceneBase{
         this.gl.enable(this.gl.CULL_FACE);
         this.program = GLUtil.createProgram(this.gl, vshader, fshader);
         this.gl.useProgram(this.program);
-
-        // オブジェクト
-        this.prevTime = this.timer.tmpTime;
-        this.flow_objs = [];
     }
 
     enter() {
@@ -378,76 +717,21 @@ export default class GameScene extends SceneBase{
         // 描画設定はここでしておくと良い？
         // ゲームを中断して、中断していた状況に戻れるような状況が必要になる可能性も考慮
 
-        this.pipe_radius = 1.0;
+        // 土管の太さ
+        const pipe_radius = 1.0;
+        const character_size = 1.0;
+
+        // キャラクター
+        this.character = new RamielCharacter(this.timer, character_size);
+        this.characterVAOs = this.character.createVAOs(this.gl, this.program);
+
         // ステージの初期化
-        this.level = new Level(this.timer, this.pipe_radius);
+        this.level = new Level(this.timer, pipe_radius, character_size);
+        this.levelVAOs = this.level.createVAOs(this.gl, this.program);
 
-        // カメラ位置と画角を設定
-        const camPos = [0,2,-10];
-        const vMat = MU.mm( MU.camLookUpL(-10), MU.camMove(...camPos) );
-        const pMat = MU.proj( 30, 1, 1, 1000);
-        const camPosPtr = this.gl.getUniformLocation(this.program, 'camPos');
-        const vMatPtr = this.gl.getUniformLocation(this.program, 'vMat');
-        const pMatPtr = this.gl.getUniformLocation(this.program, 'pMat');
-        this.gl.uniform3fv(camPosPtr, camPos);
-        this.gl.uniformMatrix4fv(vMatPtr,  true /*=transpose*/, new Float32Array( vMat.flat() ));
-        this.gl.uniformMatrix4fv(pMatPtr,  true /*=transpose*/, new Float32Array( pMat.flat() ));
-
-        this.bgPtr = this.gl.getUniformLocation(this.program, 'isBackground');
-
-        // オブジェクトを作成、最初は適当でよい
-        const quat  = [ 1,0,0,0 ];
-        const scale = [ 1.0, 1.0, 1.0 ];
-        const shift = [ 0,0,0 ];
-
-        // ラミエル
-        ////const ramiel_color = [[1,0,0],[0,1,0],[0,0,1],[0,1,1],
-        ////                      [1,0,1],[1,1,0],[0,0,0],[0.7,0.7,0.7]]; // debug
-        const ramiel_color = [...Array(8)].map(()=>[0,0.8,1.0]);
-        const ramiel = new Ramiel( ramiel_color );
-        this.ramiel_length = ramiel.length;
-        this.ramielVAO = GLUtil.createVAO( this.gl, this.program,
-                                    [ramiel.vertices, ramiel.colors, ramiel.normals, quat,   scale,   shift   ],
-                                    ['pos',           'coli',        'normal',       'quat', 'scale', 'shift' ],
-                                    [null,            null,          null,           1,      1,       1,      ],
-                                    [ramiel.vdim,     ramiel.cdim,   ramiel.ndim,    4,      3,       3,      ],
-                                    ramiel.indices );
         // 背景
-        const world = new Universe();
-        this.world_length = world.length;
-        this.worldVAO = GLUtil.createVAO( this.gl, this.program,
-                                    [world.vertices, world.colors, world.normals, quat,   scale,   shift   ],
-                                    ['pos',          'coli',       'normal',      'quat', 'scale', 'shift' ],
-                                    [null,           null,         null,          1,      1,       1,      ],
-                                    [world.vdim,     world.cdim,   world.ndim,    4,      3,       3,      ],
-                                    world.indices);
-        // 土管
-        const pipe = new Pipe();
-        this.pipe_length = pipe.length;
-        this.pipeVAO = GLUtil.createVAO( this.gl, this.program,
-                                    [pipe.vertices, pipe.colors,  pipe.normals, quat,   scale,   shift   ],
-                                    ['pos',         'coli',       'normal',     'quat', 'scale', 'shift' ],
-                                    [null,          null,         null,         1,      1,       1,      ],
-                                    [pipe.vdim,     pipe.cdim,    pipe.ndim,    4,      3,       3,      ],
-                                    pipe.indices);
-
-        ///this.ch = { 'gravity'         : -3,
-        ///            'posY'            : 0,
-        ///            'vY'              : 0,
-        ///            'time'            : this.timer.tmpTime,
-        ///            'tmpres'          : 10,
-        ///            'jump'            : 5,
-        ///            'last_jump_time'  : null, };
-        this.ch = {
-            'gravity'   : -6,
-            'jump_stack': [],
-            'jumpAY'    : 500, // m/s/s
-            'jumpAT'    : 10,  // ms
-            'prev_time' : null,
-            'started'   : false,
-            'speedY'    : 0,
-            'posY'      : 0,
-        };
+        this.world = new Background(this.timer);
+        this.worldVAOs = this.world.createVAOs(this.gl, this.program);
     }
 
     exit() {
@@ -456,75 +740,42 @@ export default class GameScene extends SceneBase{
     
     render() {
 
-        ////////////////////////////////////////////////////////////////////////
-        { // コントローラーの受け取り
-            
+        ///// ゲーム状態の更新処理
 
-            let ups = []; // 前フレーム以降に押されたジャンプボタンの履歴
+        { // コントローラーの受け取り
+            const ups = []; // 前フレーム以降に押されたジャンプボタンの履歴
             for(let key in this.ctrlHist){ // このシーンで受け付ける種類のキーについて処理していく
                 if(this.controller.KeyBoard[key].length===0) continue; // キーが押されていないなら処理の必要なし
                 for(let i=this.controller.KeyBoard[key].length-1;i>=0;i--){ // 最新のキー入力から処理していく
-                    const id = this.controller.KeyBoard[key][i].start;        // そのキー入力固有のIDを作成
-                    if(id in this.ctrlHist[key]) break; // このシーンでもう処理済みのキー入力なら無視
-                    ////if(id > now_ms) break; // 入力のほうが先行していたらやめる
-                    this.ctrlHist[key][id] = 'done'; // このシーンでもう処理したキー入力として記憶
-                    if(key===' ') ups.push( this.controller.KeyBoard[key][i].start );
+                    const keyInput = this.controller.KeyBoard[key][i];
+                    const id = keyInput.start;        // そのキー入力固有のIDを作成
+
+                    // このシーンでもう終了したキー入力なら無視
+                    if( (id in this.ctrlHist[key])&&( this.ctrlHist[key][id].end !== null ) ) break;
+                    
+                    // 開始時刻、終了時刻
+                    const data = {'start': keyInput.start,
+                                  'end'  : 'end' in keyInput ? keyInput.end : null };
+                    this.ctrlHist[key][id] = data; // 開始したキーとして記憶
+
+                    if(key===' ') ups.push( data );
                 }
             }
-
-            // ジャンプ操作集計
-            if(ups.length!==0){
-                if(!this.ch.started){ // キャラクター操作が開始されていなかったら
-                    this.ch.started = true; // キャラクター操作を開始
-                    this.ch.prev_time = ups[0]; // 最後に計算した時刻を
-                }
-                this.ch.jump_stack = this.ch.jump_stack.concat(ups);
-            }
-
-            // 変位計算
-            if(this.ch.started){
-                const now_ms = this.timer.tmpTime;    
-                const msec = now_ms-this.ch.prev_time;
-                // 加速度をリストアップ
-                const accel = new Float64Array( msec );
-                for(let i=0,j=this.ch.prev_time;i<msec;i++,j++){
-                    accel[i] = this.ch.gravity;
-                    for(let k=0;k<this.ch.jump_stack.length;k++){
-                        const jump = this.ch.jump_stack[k];
-                        if( jump<=j && j<jump+this.ch.jumpAT ){
-                            console.log('hoge', this.ch.jumpAY);
-                            accel[i] += this.ch.jumpAY;
-                        }
-                    }
-                }
-
-                // いらなくなったジャンプを消す
-                let delcount = 0;
-                for(let k=0;k<this.ch.jump_stack.length;k++){
-                    if(this.ch.jump_stack[k]+this.ch.jumpAT<=now_ms) delcount++;
-                }
-                this.ch.jump_stack.splice(0,delcount);
-
-                // 速度、位置の計算
-                const speed = new Float64Array( msec );
-                speed[0] = this.ch.speedY + accel[0]*0.001;
-                const posiY = new Float64Array( msec );
-                posiY[0] = this.ch.posY + speed[0]*0.001;
-                for(let i=1;i<msec;i++){
-                    speed[i] = speed[i-1]+accel[i]*0.001;
-                    posiY[i] = posiY[i-1]+speed[i]*0.001;
-                }
-
-                this.ch.posY   = posiY[msec-1];
-                this.ch.speedY = speed[msec-1];
-                this.ch.prev_time = now_ms;
-            }
-        }
+            // ジャンプ処理
+            this.character.jump( ups );
+        } // コントローラーの受け取りここまで
 
         // ステージの更新
         this.level.update();
 
-        ////////////////////////////////////////////////////////////////////////
+        // 当たり判定
+        if( this.character.is_colliding(this.level.collider) ){
+            this.character.decrement_stocks(1);
+
+            console.log(this.character.isDead);
+        }
+
+        ///// 描画関係の処理
 
         { // 描画範囲の座標限界を設定
             [this.Xlim,this.Ylim,this.sXlim,this.sYlim] = this.offScreen.getXYlims();
@@ -539,81 +790,132 @@ export default class GameScene extends SceneBase{
             this.gl.uniform2fv(sXYlimPtr, [this.sXlim,this.sYlim]);
         }
 
-        // 描画処理
+        // カメラ位置と画角を設定
+        {
+            const camPos = [0,2,-10];
+            const vMat = MU.mm( MU.camLookUpL(-10), MU.camMove(...camPos) );
+            const pMat = MU.proj( 30, 1, 1, 1000);
+            const camPosPtr = this.gl.getUniformLocation(this.program, 'camPos');
+            const vMatPtr = this.gl.getUniformLocation(this.program, 'vMat');
+            const pMatPtr = this.gl.getUniformLocation(this.program, 'pMat');
+            this.gl.uniform3fv(camPosPtr, camPos);
+            this.gl.uniformMatrix4fv(vMatPtr,  true /*=transpose*/, new Float32Array( vMat.flat() ));
+            this.gl.uniformMatrix4fv(pMatPtr,  true /*=transpose*/, new Float32Array( pMat.flat() ));
+        }
+
+        // 画面を初期化
         this.gl.clear(this.gl.COLOR_BUFFER_BIT|this.gl.DEPTH_BUFFER_BIT);
+        // 背景の描画
+        this.world.render(this.gl, this.program, this.worldVAOs);
+        // キャラクターの描画
+        this.character.render(this.gl, this.program, this.characterVAOs);
+        // ステージの描画
+        this.level.render(this.gl, this.program, this.levelVAOs);
 
-        // 世界
-        {   // 場所と姿勢のパラメータのみ書き換える
-            const quat = QU.gen( [0,1,0], 0 );
-            const scale = [ 1,1,1 ];
-            const shift = [ 0,0,0 ];
-        
-            GLUtil.changeVAOsVariable(this.gl, this.program, this.worldVAO, 'quat',  GLUtil.createVBO(this.gl, quat ), /*stride*/ 4);
-            GLUtil.changeVAOsVariable(this.gl, this.program, this.worldVAO, 'scale', GLUtil.createVBO(this.gl, scale), /*stride*/ 3);
-            GLUtil.changeVAOsVariable(this.gl, this.program, this.worldVAO, 'shift', GLUtil.createVBO(this.gl, shift), /*stride*/ 3);
-
-            GLUtil.sendVAO(this.gl, this.worldVAO);
-            this.gl.uniform1i(this.bgPtr, 1);
-            this.gl.drawElementsInstanced(this.gl.TRIANGLES, this.world_length, this.gl.UNSIGNED_SHORT,
-                                          /*start*/0, /*#-obj*/ 1);
-        }
-
-        // ラミエル
-        {   // 場所と姿勢を決める
-            const ang_rad = ((this.timer.tmpTime*0.2)/360%1)*(2*Math.PI);
-            const pos_rad = ((this.timer.tmpTime*0.1)/360%1)*(2*Math.PI);
-        
-            const rotV = [0,1,0];
-            const [ang0,ang1] = [ ang_rad, ang_rad+0.5*Math.PI ];
-        
-            const quat  = [ rotV[0]*Math.sin(ang0/2.0), rotV[1]*Math.sin(ang0/2.0), rotV[2]*Math.sin(ang0/2.0), Math.cos(ang0/2.0),
-                            rotV[0]*Math.sin(ang1/2.0), rotV[1]*Math.sin(ang1/2.0), rotV[2]*Math.sin(ang1/2.0), Math.cos(ang1/2.0),
-                            rotV[0]*Math.sin(ang1/2.0), rotV[1]*Math.sin(ang1/2.0), rotV[2]*Math.sin(ang1/2.0), Math.cos(ang1/2.0)];
-            const scale = [ 0.2,0.2,0.2,  0.2,0.2,0.2,  1,1,1 ];
-            const shift = [ 2*Math.cos(pos_rad),             0, 2*Math.sin(pos_rad),
-                            3*Math.cos(pos_rad+0.5*Math.PI), 0, 3*Math.sin(pos_rad+0.5*Math.PI),
-                            0, this.ch.posY, 0 ];
-        
-            // 場所と姿勢のパラメータのみ書き換える
-            GLUtil.changeVAOsVariable(this.gl, this.program, this.ramielVAO, 'quat',  GLUtil.createVBO(this.gl, quat ), /*stride*/ 4);
-            GLUtil.changeVAOsVariable(this.gl, this.program, this.ramielVAO, 'scale', GLUtil.createVBO(this.gl, scale), /*stride*/ 3);
-            GLUtil.changeVAOsVariable(this.gl, this.program, this.ramielVAO, 'shift', GLUtil.createVBO(this.gl, shift), /*stride*/ 3);
-        
-            GLUtil.sendVAO(this.gl, this.ramielVAO);
-            this.gl.uniform1i(this.bgPtr, 0);
-            this.gl.drawElementsInstanced(this.gl.TRIANGLES, this.ramiel_length, this.gl.UNSIGNED_SHORT,
-                                          /*start*/0, /*#-obj*/ 3);
-        }
-
-        // 土管
-        let collider = null;
-        {   // 場所と姿勢のパラメータのみ書き換える
-            /// const quat0 = QU.gen( [0,1,0], this.timer.tmpTime*0.2 );
-            /// const quat1 = QU.gen( [1,0,0], this.timer.tmpTime*0.1 );
-            /// const quat = QU.mul( quat0, quat1  );
-            /// //const quat = QU.gen( [1,0,0], 80 );
-            /// const scale = [ 1,1,1 ];
-            /// const shift = [ 0,0,0 ];
-            /// const numObj = 1;
-
-            const [quat,scale,shift,numObj,col_] = this.level.data;
-            collider = col_;
-
-            GLUtil.changeVAOsVariable(this.gl, this.program, this.pipeVAO, 'quat',  GLUtil.createVBO(this.gl, quat ), /*stride*/ 4);
-            GLUtil.changeVAOsVariable(this.gl, this.program, this.pipeVAO, 'scale', GLUtil.createVBO(this.gl, scale), /*stride*/ 3);
-            GLUtil.changeVAOsVariable(this.gl, this.program, this.pipeVAO, 'shift', GLUtil.createVBO(this.gl, shift), /*stride*/ 3);
-        
-            GLUtil.sendVAO(this.gl, this.pipeVAO);
-            this.gl.uniform1i(this.bgPtr, 0);
-            this.gl.drawElementsInstanced(this.gl.TRIANGLES, this.pipe_length, this.gl.UNSIGNED_SHORT,
-                                            /*start*/0, /*#-obj*/ numObj);
-        }
-
-        ////////////////////////////////////////////////////////////////////////
-        // 衝突判定
-
-
+        // 画面を更新
         this.gl.flush();
+    }
+
+
+    // デバッグ画面の初期化
+    open_debugger(H,W) {
+        this.debugScreen = new OffScreen(H,W, '2d',false,false);
+        this.debugNS = {};
+        const [w,h] = this.gameResolution;
+
+        this.debugNS.disp1 = new OffScreen(h,w, 'webgl2', false, false);
+        this.debugNS.gl1 = this.debugNS.disp1.context;
+
+        this.debugNS.gl1.clearColor(0.0, 0.0, 0.0, 1.0); // 背景色 = 黒
+        this.debugNS.gl1.enable(this.debugNS.gl1.CULL_FACE);
+        this.debugNS.program1 = GLUtil.createProgram(this.debugNS.gl1, vshader, fshader);
+        this.debugNS.gl1.useProgram(this.debugNS.program1);
+
+        this.debugNS.disp2 = new OffScreen(h,w, 'webgl2', false, false);
+        this.debugNS.gl2 = this.debugNS.disp2.context;
+
+        this.debugNS.gl2.clearColor(0.0, 0.0, 0.0, 1.0); // 背景色 = 黒
+        this.debugNS.gl2.enable(this.debugNS.gl2.CULL_FACE);
+        this.debugNS.program2 = GLUtil.createProgram(this.debugNS.gl2, vshader, fshader);
+        this.debugNS.gl2.useProgram(this.debugNS.program2);
+
+        this.debugNS.initialized = false;
+    }
+    debug_initializer() {
+        this.debugNS.world1 = this.world.createVAOs( this.debugNS.gl1, this.debugNS.program1);
+        this.debugNS.level1 = this.level.createVAOs( this.debugNS.gl1, this.debugNS.program1);
+        this.debugNS.chara1 = this.character.createVAOs( this.debugNS.gl1, this.debugNS.program1);
+    }
+    // デバッグ画面の消去
+    close_debugger() {
+        this.debugScreen = null;
+        this.debugNS = null;
+    }
+    // デバッグ画面が表示されているときに実行される関数
+    debug_render() {
+
+        if(!this.debugNS.initialized) this.debug_initializer();
+
+        this.debugScreen.context.fillStyle = "rgb(20,100,100)";
+        this.debugScreen.context.fillRect(0,0,this.debugScreen.canvas.width,
+                                              this.debugScreen.canvas.height);
+        
+        const [cvs1,cvs2] = [this.debugNS.disp1.canvas, this.debugNS.disp2.canvas];
+        const [gl1,gl2] = [this.debugNS.gl1, this.debugNS.gl2];
+        const [prg1,prg2] = [this.debugNS.program1, this.debugNS.program2];
+
+        // 処理
+
+        {
+            
+            { // 描画範囲の座標限界を設定
+                [this.Xlim,this.Ylim,this.sXlim,this.sYlim] = this.offScreen.getXYlims();
+                const [u,v] = [this.offScreen.canvas.width, this.offScreen.canvas.height];
+                const resPtr = gl1.getUniformLocation(prg1, 'resolution');
+                gl1.uniform2fv(resPtr, [u,v]);
+                const XYlimPtr = gl1.getUniformLocation(prg1, 'XYlim');
+                gl1.uniform2fv(XYlimPtr, [this.Xlim,this.Ylim]);
+                const XYlim2Ptr = gl1.getUniformLocation(prg1, 'XYlim2');
+                gl1.uniform2fv(XYlim2Ptr, [this.Xlim,this.Ylim]);
+                const sXYlimPtr = gl1.getUniformLocation(prg1, 'sXYlim');
+                gl1.uniform2fv(sXYlimPtr, [this.sXlim,this.sYlim]);
+            }
+
+            // カメラ位置と画角を設定
+            {
+                const camPos = [0,2,-10];
+                const vMat = MU.mm( MU.camLookUpL(-10), MU.camMove(...camPos) );
+                const pMat = MU.proj( 30, 1, 1, 1000);
+                const camPosPtr = gl1.getUniformLocation(prg1, 'camPos');
+                const vMatPtr = gl1.getUniformLocation(prg1, 'vMat');
+                const pMatPtr = gl1.getUniformLocation(prg1, 'pMat');
+                gl1.uniform3fv(camPosPtr, camPos);
+                gl1.uniformMatrix4fv(vMatPtr,  true /*=transpose*/, new Float32Array( vMat.flat() ));
+                gl1.uniformMatrix4fv(pMatPtr,  true /*=transpose*/, new Float32Array( pMat.flat() ));
+            }
+
+            // 画面を初期化
+            gl1.clear(gl1.COLOR_BUFFER_BIT|gl1.DEPTH_BUFFER_BIT);
+            // 背景の描画
+            this.world.render(gl1, prg1, this.debugNS.world1);
+            // キャラクターの描画
+            this.character.render(gl1, prg1, this.debugNS.chara1);
+            // ステージの描画
+            this.level.render(gl1, prg1, this.debugNS.level1);
+            // デバッグ
+            this.character.debug_collider(gl1, prg1, this.level.collider);
+            // 画面を更新
+            gl1.flush();
+
+        }
+
+
+        const [H,W] = [Math.floor(this.debugScreen.canvas.height*0.5), this.debugScreen.canvas.width];
+        this.debugScreen.context.drawImage( cvs1, Math.floor(W*0.03), Math.floor(H*0.03),
+                                                  Math.floor(W*0.94), Math.floor(H*0.94),  );
+
+        this.debugScreen.context.drawImage( cvs2, Math.floor(W*0.03), Math.floor(H*1.03),
+                                                  Math.floor(W*0.94), Math.floor(H*0.94),  );
     }
 
 }
