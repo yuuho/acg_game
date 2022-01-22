@@ -13,11 +13,12 @@ class KyeBoard {
         this.ArrowLeft  = [];
         this.ArrowRight = [];
         this.Enter      = [];
+        this[' ']       = [];
 
         // キーが押されたときの処理
         this.keyDownHandler = (evt)=>{
                 if(evt.key in this){
-                    console.log(evt.key, 'v');
+                    ////console.log(evt.key, 'v');
                     const queue = this[evt.key];
                     // キューに中身が無い or キューの最後のやつが離し済み なら追加
                     if(queue.length===0 || 'end' in queue[queue.length-1]){
@@ -28,7 +29,7 @@ class KyeBoard {
         // キーが離されたときの処理
         this.keyUpHandler = (evt)=>{
                 if(evt.key in this){
-                    console.log(evt.key, '^');
+                    ////console.log(evt.key, '^');
                     const queue = this[evt.key];
                     queue[queue.length-1]['end'] = (new Date()).getTime()-this.gameTimer.startTime;
                 }

@@ -7,8 +7,8 @@ import OffScreen from './offscreen.js';
 import {Controller} from './controller.js';
 // 遷移先
 import GameScene from './scene_game.js';
-import Test1Scene from './scene_test1.js';
-import Test2Scene from './scene_test2.js';
+//import Test1Scene from './scene_test1.js';
+//import Test2Scene from './scene_test2.js';
 import ConfigScene from './scene_config.js';
 
 
@@ -62,8 +62,8 @@ export default class StartScene extends SceneBase{
         this.ctrlHist = {'ArrowUp':{}, 'ArrowDown':{}, 'Enter':{}};
 
         this.menuList = [{'name':'GAME START',       'scene':GameScene},
-                         {'name':'CONTROLLER CHECK', 'scene':Test1Scene},
-                         {'name':'DISPLAY CHECK',    'scene':Test2Scene},
+                         //{'name':'CONTROLLER CHECK', 'scene':Test1Scene},
+                         //{'name':'DISPLAY CHECK',    'scene':Test2Scene},
                          {'name':'CONFIG',           'scene':ConfigScene},]
 
         this.gl = this.offScreen.context;
@@ -73,7 +73,7 @@ export default class StartScene extends SceneBase{
 
         // 使用する文字列をテクスチャとして生成
         this.strings = [];
-        this.strings = this.strings.concat(['GAME TITLE']);
+        this.strings = this.strings.concat(['Flappy Ramiel 3D']);
         this.strings = this.strings.concat(this.menuList.map(x=>x.name));
         const stringPtr = this.gl.getUniformLocation(this.program, 'strings');
         let stringCvs; [stringCvs, this.texPoss, this.strDatas]

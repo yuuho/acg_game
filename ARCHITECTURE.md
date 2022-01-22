@@ -59,10 +59,35 @@ OffScreen (= WebGL の描画処理などを走らせる用の画面)を分けて
 各シーンごとに別々のコントローラーを準備するようにした。
 
 
+## 各シーンのメソッド
+
+- ``constructor`` : RealScreen,GameTimer,SceneManager などのインスタンスを受け取り。
+                    シーンの `scene_initialize` メソッドを呼ぶ。
+                    SceneBase で定義済みのものをそのまま使う
+- ``scene_initialize`` : シーン固有の諸々を初期化したりするメソッド。
+- ``enter`` : シーン切り替えで入る際にやる処理。
+                RealScreen が描画すべき画面としてそのシーンを登録する処理が必須。
+                登録前に ``scene_initialize`` 内でも ``enter`` 内でも良いが offScreen という
+                プロパティに offscreen を作成する処理が必須。
+- ``exit`` : シーンの切り替えで抜けるときにやる処理。
+- ``render`` : シーンがアクティブなときに毎フレーム呼ばれる。
+                このメソッド内で OffScreen の中身を更新しなければいけない。
+                コントローラーの状況確認や、諸々のモデルやパラメータを処理するとよい。
+- ``open_debugger`` : デバッグモードに入る時の処理 ``debugScreen`` というプロパティに
+                    offscreen を作成する処理が必要。
+- ``close_debugger`` : デバッグモードから抜けるときの処理
+- ``debug_render`` : デバッグ用 offscreen の描画処理
+
+
+### シーンが作成されるときの順番
+1. constructor
+    1. scene_initialize()
+2. open_debugger()
+3. enter()
+    1. this.realScreen.setScene()
+
+なので、特に ``scene_initialize`` で必須な処理はない。
+
 ## その他
 
 なんか適当に書いていたら各クラスが密に結合してしまって大惨事になったので考え直すかも。
-
-TODO:
-- フルスクリーンのサンプル
-- デバッグ画面を作る
