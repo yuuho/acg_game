@@ -96,6 +96,7 @@ uniform vec2 sXYlim;
 uniform vec2 resolution;
 uniform int isBackground;
 uniform float objectAlpha;
+uniform float utime;
 
 out vec4 color_out;
 
@@ -108,10 +109,26 @@ vec4 shading(vec3 vcolor, vec3 wpos, vec3 nvec, vec3 vvec){
                     + vec4( pointShadeD(       wpos, nvec ), 1.0);
 }
 
+float rand(float n){return fract(sin(n) * 43758.5453123);}
+vec4 space_background(){
+    float a = 200.0;
+
+    float d = distance(vec3(0.0, 0.0,a),wpos)/(sqrt(6.0)*a);
+    int n = 10;
+    int m = 900;
+    float pi = 3.14159265358979;
+    float d2 = floor( (atan(wpos.x/wpos.y)+pi*step(0.0,wpos.x)+0.5*pi)/(2.0*pi) *float(m))/float(m) ;
+    return vec4(
+            //vec3( pow( fract( d+d2-utime/50000.0 + rand(d2) ), 100.0 ) ),
+            vec3( exp( ( fract( d+d2-utime/50000.0 + rand(d2) )-1.0 )/0.001 ) ),
+            1.0);
+}
+
 void main() {
     vec4 color;
     if(isBackground>0){
-        color = vec4(0.1,0.2,0.2,1.0);
+        //color = vec4(vec3(0.0),1.0);
+        color = space_background();
     }else{
         color = shading( colo, wpos, nvec, vvec );
     }
@@ -815,6 +832,10 @@ export default class GameScene extends SceneBase{
             this.gl.uniform2fv(XYlim2Ptr, [this.Xlim,this.Ylim]);
             const sXYlimPtr = this.gl.getUniformLocation(this.program, 'sXYlim');
             this.gl.uniform2fv(sXYlimPtr, [this.sXlim,this.sYlim]);
+            // 時間の設定
+            const timePtr = this.gl.getUniformLocation(this.program, 'utime');
+            this.gl.uniform1f(timePtr, this.timer.tmpTime);
+            
         }
 
         // カメラ位置と画角を設定
@@ -918,6 +939,9 @@ export default class GameScene extends SceneBase{
                 gl1.uniform2fv(XYlim2Ptr, [this.Xlim,this.Ylim]);
                 const sXYlimPtr = gl1.getUniformLocation(prg1, 'sXYlim');
                 gl1.uniform2fv(sXYlimPtr, [this.sXlim,this.sYlim]);
+                // 時間の設定
+                const timePtr = gl1.getUniformLocation(prg1, 'utime');
+                gl1.uniform1f(timePtr, this.timer.tmpTime);
             }
 
             { // カメラ位置と画角を設定
@@ -973,6 +997,9 @@ export default class GameScene extends SceneBase{
                 gl2.uniform2fv(XYlim2Ptr, [this.Xlim,this.Ylim]);
                 const sXYlimPtr = gl2.getUniformLocation(prg2, 'sXYlim');
                 gl2.uniform2fv(sXYlimPtr, [this.sXlim,this.sYlim]);
+                // 時間の設定
+                const timePtr = gl2.getUniformLocation(prg2, 'utime');
+                gl2.uniform1f(timePtr, this.timer.tmpTime);
             }
 
             { // カメラ位置と画角を設定
