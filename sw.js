@@ -17,6 +17,7 @@ var urlsToCache = [
     "src/realscreen.js",
     "src/scene_config.js",
     "src/scene_game.js",
+    "src/scene_gameover.js",
     "src/scene_start.js",
     "src/scenebase.js",
     "src/strutil.js",

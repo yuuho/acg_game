@@ -10,7 +10,7 @@ import OffScreen from './offscreen.js';
 import {Controller} from './controller.js';
 import SU from './glslutil.js';
 // 遷移先
-//import StartScene from './scene_start.js';
+import GameOverScene from './scene_gameover.js';
 
 ////import * as THREE from 'https://unpkg.com/three/build/three.module.js';
 
@@ -95,6 +95,8 @@ uniform vec2 XYlim2;
 uniform vec2 sXYlim;
 uniform vec2 resolution;
 uniform int isBackground;
+uniform float objectAlpha;
+uniform float utime;
 
 out vec4 color_out;
 
@@ -107,17 +109,34 @@ vec4 shading(vec3 vcolor, vec3 wpos, vec3 nvec, vec3 vvec){
                     + vec4( pointShadeD(       wpos, nvec ), 1.0);
 }
 
+float rand(float n){return fract(sin(n) * 43758.5453123);}
+vec4 space_background(){
+    float a = 200.0;
+
+    float d = distance(vec3(0.0, 0.0,a),wpos)/(sqrt(6.0)*a);
+    int n = 10;
+    int m = 900;
+    float pi = 3.14159265358979;
+    float d2 = floor( (atan(wpos.x/wpos.y)+pi*step(0.0,wpos.x)+0.5*pi)/(2.0*pi) *float(m))/float(m) ;
+    return vec4(
+            //vec3( pow( fract( d+d2-utime/50000.0 + rand(d2) ), 100.0 ) ),
+            vec3( exp( ( fract( d+d2-utime/50000.0 + rand(d2) )-1.0 )/0.001 ) ),
+            1.0);
+}
+
 void main() {
     vec4 color;
     if(isBackground>0){
-        color = vec4(0.1,0.2,0.2,1.0);
+        //color = vec4(vec3(0.0),1.0);
+        color = space_background();
     }else{
         color = shading( colo, wpos, nvec, vvec );
     }
     color = vec4( clamp(color.x,0.0,1.0),
                   clamp(color.y,0.0,1.0),
                   clamp(color.z,0.0,1.0),
-                  clamp(color.w,0.0,1.0) );
+                  objectAlpha );
+                  ///clamp(color.w,0.0,1.0) );
 
     // 画面上の座標によって安全エリア外は暗くする
     vec2 dpos = (gl_FragCoord.xy/resolution.xy*2.0-1.0)*XYlim2.xy;
@@ -245,6 +264,7 @@ class Level extends Renderable {
     
         GLUtil.sendVAO(gl, VAO);
         gl.uniform1i( gl.getUniformLocation(program, 'isBackground'), 0); // とりあえず
+        gl.uniform1f( gl.getUniformLocation( program, 'objectAlpha'), 1.0 );
         gl.drawElementsInstanced(gl.TRIANGLES, this.model.length, gl.UNSIGNED_SHORT, /*start*/0, /*#-obj*/ numObj);
     }
 
@@ -407,6 +427,7 @@ class Background extends Renderable{
 
         GLUtil.sendVAO(gl, VAOs );
         gl.uniform1i( gl.getUniformLocation(program, 'isBackground'), 1); // とりあえず
+        gl.uniform1f( gl.getUniformLocation( program, 'objectAlpha'), 1.0 );
         gl.drawElementsInstanced(gl.TRIANGLES, this.model.length, gl.UNSIGNED_SHORT, /*start*/0, /*#-obj*/ 1);
     }
 }
@@ -471,20 +492,23 @@ class RamielCharacter extends Character{
     }
     // モデルレンダリング
     render(gl,program,VAOs) {
-        const ang_rad = ((this.timer.tmpTime*0.2)/360%1)*(2*Math.PI);
-        const pos_rad = ((this.timer.tmpTime*0.1)/360%1)*(2*Math.PI);
-    
         const rotV = [0,1,0];
-        const [ang0,ang1] = [ ang_rad, ang_rad+0.5*Math.PI ];
         const [posX, posY, posZ] = this.position;
     
-        const quat  = [ rotV[0]*Math.sin(ang0/2.0), rotV[1]*Math.sin(ang0/2.0), rotV[2]*Math.sin(ang0/2.0), Math.cos(ang0/2.0),
-                        rotV[0]*Math.sin(ang1/2.0), rotV[1]*Math.sin(ang1/2.0), rotV[2]*Math.sin(ang1/2.0), Math.cos(ang1/2.0),
-                        rotV[0]*Math.sin(ang1/2.0), rotV[1]*Math.sin(ang1/2.0), rotV[2]*Math.sin(ang1/2.0), Math.cos(ang1/2.0)];
-        const scale = [ 0.2,0.2,0.2,  0.2,0.2,0.2,  this.character_size,this.character_size,this.character_size ];
-        const shift = [ 2*Math.cos(pos_rad),             0, 2*Math.sin(pos_rad),
-                        3*Math.cos(pos_rad+0.5*Math.PI), 0, 3*Math.sin(pos_rad+0.5*Math.PI),
-                        posX, posY, posZ ];
+        const isrespawn = this.timer.tmpTime<this.intangible_start+this.intangible_time;
+        let quat  = [ ...QU.gen( rotV,  isrespawn? 0 : this.timer.tmpTime*0.2 )];
+        let scale = [ this.character_size,this.character_size,this.character_size ];
+        let shift = [ posX,posY,posZ ];
+
+
+        const r = Math.min( 2*Math.PI/this.num_stock, 1/3*Math.PI );
+        const t = ((this.timer.tmpTime*0.1)/360%1)*(2*Math.PI);
+        const R = 2;
+        for(let i=1;i<this.num_stock;i++){
+            quat  = quat.concat( QU.gen(rotV, this.timer.tmpTime*0.2 ) );
+            scale = scale.concat([0.2,0.2,0.2]);
+            shift = shift.concat([ R*Math.cos(t+i*r), posY, R*Math.sin(t+i*r) ]);
+        }
 
         // 場所と姿勢のパラメータのみ書き換える
         GLUtil.changeVAOsVariable(gl, program, VAOs, 'quat',  GLUtil.createVBO(gl, quat ), /*stride*/ 4);
@@ -494,7 +518,14 @@ class RamielCharacter extends Character{
         // 描画
         GLUtil.sendVAO(gl, VAOs);
         gl.uniform1i( gl.getUniformLocation( program, 'isBackground'), 0); // とりあえず
-        gl.drawElementsInstanced( gl.TRIANGLES, this.model.length, gl.UNSIGNED_SHORT, /*start*/0, /*#-obj*/ 3);
+        // 無敵のときの点滅
+        if(this.timer.tmpTime<this.intangible_start+this.intangible_time){
+            const r = (this.timer.tmpTime-this.intangible_start)/this.intangible_freq*2*Math.PI;
+            gl.uniform1f( gl.getUniformLocation( program, 'objectAlpha'), Math.cos(r) );
+        }else{
+            gl.uniform1f( gl.getUniformLocation( program, 'objectAlpha'), 1.0 );
+        }
+        gl.drawElementsInstanced( gl.TRIANGLES, this.model.length, gl.UNSIGNED_SHORT, /*start*/0, /*#-obj*/ this.num_stock);
     }
 
     /// Character methods
@@ -516,7 +547,9 @@ class RamielCharacter extends Character{
         this.speedY     = 0;
         this.posY       = 0;
 
-        this.hoge = this.timer.tmpTime;
+        this.intangible_freq  = 700;
+        this.intangible_start = -999999;
+        this.intangible_time  = 3000;
     }
 
     // ジャンプなど
@@ -657,13 +690,17 @@ class RamielCharacter extends Character{
     }
 
     decrement_stocks(num) {
-        this.num_stock -= num;
-        // TODO : respawn
-        this.jump_stack = [];
-        this.prev_time  = null;
-        this.started    = false;
-        this.speedY     = 0;
-        this.posY       = 0;
+        if(this.timer.tmpTime>this.intangible_start+this.intangible_time){
+            this.num_stock -= num;
+            // TODO : respawn
+            this.jump_stack = [];
+            this.prev_time  = null;
+            this.started    = false;
+            this.speedY     = 0;
+            this.posY       = 0;
+
+            this.intangible_start = this.timer.tmpTime;
+        }
     }
 
     get position() {
@@ -773,9 +810,13 @@ export default class GameScene extends SceneBase{
 
         // 当たり判定
         if( this.character.is_colliding(this.level.collider) ){
+            // 当たったら残機が１減る
             this.character.decrement_stocks(1);
 
-            console.log(this.character.isDead);
+            // 残機 0 なら GAME OVER
+            if(this.character.isDead){
+                this.sceneMg.changeScene( GameOverScene.sceneName, GameOverScene );
+            }
         }
 
         ///// 描画関係の処理
@@ -791,6 +832,10 @@ export default class GameScene extends SceneBase{
             this.gl.uniform2fv(XYlim2Ptr, [this.Xlim,this.Ylim]);
             const sXYlimPtr = this.gl.getUniformLocation(this.program, 'sXYlim');
             this.gl.uniform2fv(sXYlimPtr, [this.sXlim,this.sYlim]);
+            // 時間の設定
+            const timePtr = this.gl.getUniformLocation(this.program, 'utime');
+            this.gl.uniform1f(timePtr, this.timer.tmpTime);
+            
         }
 
         // カメラ位置と画角を設定
@@ -894,6 +939,9 @@ export default class GameScene extends SceneBase{
                 gl1.uniform2fv(XYlim2Ptr, [this.Xlim,this.Ylim]);
                 const sXYlimPtr = gl1.getUniformLocation(prg1, 'sXYlim');
                 gl1.uniform2fv(sXYlimPtr, [this.sXlim,this.sYlim]);
+                // 時間の設定
+                const timePtr = gl1.getUniformLocation(prg1, 'utime');
+                gl1.uniform1f(timePtr, this.timer.tmpTime);
             }
 
             { // カメラ位置と画角を設定
@@ -929,6 +977,7 @@ export default class GameScene extends SceneBase{
                 GLUtil.sendVBO(gl1,prg1, 'scale' , GLUtil.createVBO(gl1,[1,1,1, 1,1,1,  1,1,1, 1,1,1,  1,1,1, 1,1,1]             ), 3);
                 GLUtil.sendVBO(gl1,prg1, 'shift' , GLUtil.createVBO(gl1,[0,0,0, 0,0,0,  0,0,0, 0,0,0,  0,0,0, 0,0,0]             ), 3);
                 GLUtil.sendIBO(gl1,                GLUtil.createIBO(gl1,[0,1, 2,3, 4,5]                                          )   );
+                gl1.uniform1f( gl1.getUniformLocation( prg1, 'objectAlpha'), 1.0 );
                 gl1.drawElements(gl1.LINES, 6, gl1.UNSIGNED_SHORT, 0);
             }
 
@@ -948,6 +997,9 @@ export default class GameScene extends SceneBase{
                 gl2.uniform2fv(XYlim2Ptr, [this.Xlim,this.Ylim]);
                 const sXYlimPtr = gl2.getUniformLocation(prg2, 'sXYlim');
                 gl2.uniform2fv(sXYlimPtr, [this.sXlim,this.sYlim]);
+                // 時間の設定
+                const timePtr = gl2.getUniformLocation(prg2, 'utime');
+                gl2.uniform1f(timePtr, this.timer.tmpTime);
             }
 
             { // カメラ位置と画角を設定
@@ -983,6 +1035,7 @@ export default class GameScene extends SceneBase{
                 GLUtil.sendVBO(gl2,prg2, 'scale' , GLUtil.createVBO(gl2,[1,1,1, 1,1,1,  1,1,1, 1,1,1,  1,1,1, 1,1,1]             ), 3);
                 GLUtil.sendVBO(gl2,prg2, 'shift' , GLUtil.createVBO(gl2,[0,0,0, 0,0,0,  0,0,0, 0,0,0,  0,0,0, 0,0,0]             ), 3);
                 GLUtil.sendIBO(gl2,                GLUtil.createIBO(gl2,[0,1, 2,3, 4,5]                                          )   );
+                gl2.uniform1f( gl2.getUniformLocation( prg2, 'objectAlpha'), 1.0 );
                 gl2.drawElements(gl2.LINES, 6, gl2.UNSIGNED_SHORT, 0);
             }
             // 画面を更新
