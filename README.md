@@ -1,3 +1,5 @@
+# Flappy Ramiel 3D
 
-# ACG Game
+Hyper-Casual Game.
 
+This software is released under the MIT License, see LICENSE.txt.
